@@ -1,0 +1,21 @@
+[general]
+name=Road Video Tracker
+qgisMinimumVersion=3.0
+description=View road survey videos synced with GPS tracks on the map
+version=1.5
+author=C.R Rhamdani
+email=chepieramdani@gmail.com
+about=Simplified road survey video viewer. Select a video file and a GPX track file, synchronize them, and view the vehicle position on the map in real-time while the video plays. Shows coordinates, heading, speed, and elevation. Uses the mpv player with JSON IPC for playback; on Windows mpv is downloaded automatically on first use and cached in the QGIS settings folder. If mpv cannot be downloaded or is not available, playback falls back to the built-in Qt Multimedia engine.
+tags=video,gps,survey,road,drone,uav,georeferenced
+category=Plugins
+icon=main_icon.svg
+homepage=https://github.com/Danii791/RoadVideoTracker
+tracker=https://github.com/Danii791/RoadVideoTracker/issues
+repository=https://github.com/Danii791/RoadVideoTracker
+license=MIT
+changelog=1.5 - Auto-download of mpv on first use; GPS-synced video playback on the map; geodesic interpolation; free/navigate modes; mini map window and embedded map panel; silent usage tracking.
+experimental=False
+deprecated=False
+designer=A. Yusrizah S.
+support=Okta Sony
+technical_advisor=Syaeful

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import os
-from PyQt5.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, Qt
-from PyQt5.QtWidgets import QAction
-from PyQt5.QtGui import QIcon
+from qgis.PyQt.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, Qt
+from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtGui import QIcon
 
 from .tracker_dock import TrackerDock
 
@@ -63,5 +63,5 @@ class VideoTracker:
         QCoreApplication.processEvents()
         send_tracking("Open")
         dlg.close()
-        self.iface.addDockWidget(Qt.LeftDockWidgetArea, self.dock)
+        self.iface.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock)
         self.dock.show()

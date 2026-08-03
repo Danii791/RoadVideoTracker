@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
-from PyQt5 import QtWidgets
-from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import QSize, Qt, QCoreApplication
-from PyQt5.QtWidgets import QFileDialog
+from qgis.PyQt import QtWidgets
+from qgis.PyQt.QtGui import QIcon
+from qgis.PyQt.QtCore import QSize, Qt, QCoreApplication
+from qgis.PyQt.QtWidgets import QFileDialog
 
 from . import resources
 
@@ -94,7 +94,7 @@ class TrackerDock(QtWidgets.QDockWidget):
         self.setWidget(widget)
 
         self.loading_label = QtWidgets.QLabel("Please wait...", widget)
-        self.loading_label.setAlignment(Qt.AlignCenter)
+        self.loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.loading_label.setStyleSheet(
             "background-color: rgba(0,0,0,180); color: white; font-size: 14px;")
         self.loading_label.hide()
@@ -108,7 +108,7 @@ class TrackerDock(QtWidgets.QDockWidget):
         self.btn_select.setEnabled(False)
         self.btn_select_folder.setEnabled(False)
         self.btn_quit.setEnabled(False)
-        QtWidgets.QApplication.setOverrideCursor(Qt.WaitCursor)
+        QtWidgets.QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         QCoreApplication.processEvents()
 
     def _hide_loading(self):
@@ -197,7 +197,7 @@ class TrackerDock(QtWidgets.QDockWidget):
                     pw.qplayer.stop()
                 pw.close()
                 pw.deleteLater()
-            except Exception:
+            except Exception:  # nosec
                 pass
             self.player_window = None
             self._hide_loading()

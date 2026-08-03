@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from PyQt5 import QtGui, QtCore
+from qgis.PyQt import QtGui, QtCore
 from qgis.core import QgsPointXY
 from qgis.gui import QgsMapCanvasItem
 

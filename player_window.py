@@ -2,14 +2,21 @@
 import os
 import sys
 import time
-from xml.dom.minidom import parse
+from defusedxml.minidom import parse
 
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtCore import Qt, QUrl, QTimer, QSize
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QStyle
-from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-from PyQt5.QtMultimediaWidgets import QVideoWidget
+from qgis.PyQt import QtWidgets, QtCore
+from qgis.PyQt.QtCore import Qt, QUrl, QTimer, QSize
+from qgis.PyQt.QtGui import QIcon
+try:
+    from qgis.PyQt.QtMultimedia import QMediaPlayer, QMediaContent
+    from qgis.PyQt.QtMultimediaWidgets import QVideoWidget
+except ImportError:
+    import importlib
+    _qt_mm = importlib.import_module('PyQt5.QtMultimedia')
+    _qt_mmw = importlib.import_module('PyQt5.QtMultimediaWidgets')
+    QMediaPlayer = _qt_mm.QMediaPlayer
+    QMediaContent = _qt_mm.QMediaContent
+    QVideoWidget = _qt_mmw.QVideoWidget
 
 from qgis.core import (
     QgsProject, QgsVectorLayer, QgsFeature, QgsGeometry,
@@ -70,8 +77,8 @@ class PlayerWindow(QtWidgets.QWidget):
         self._eof = False
 
         self.setWindowTitle("Road Video Tracker - Player")
-        self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
-        self.setFocusPolicy(Qt.StrongFocus)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.resize(600, 410)
         self._video_initialized = False
         self._gps_jumped = False
@@ -91,7 +98,7 @@ class PlayerWindow(QtWidgets.QWidget):
         layout.setContentsMargins(4, 2, 4, 0)
         layout.setSpacing(0)
 
-        self.splitter = QtWidgets.QSplitter(Qt.Horizontal)
+        self.splitter = QtWidgets.QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setChildrenCollapsible(False)
         self.splitter.setHandleWidth(4)
 
@@ -111,12 +118,12 @@ class PlayerWindow(QtWidgets.QWidget):
         layout.addWidget(self.splitter, 1)
 
         self.loading_label = QtWidgets.QLabel("Processing...", self)
-        self.loading_label.setAlignment(Qt.AlignCenter)
+        self.loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.loading_label.setStyleSheet(
             "background-color: rgba(0,0,0,180); color: white; font-size: 16px;")
         self.loading_label.hide()
 
-        self.slider = QtWidgets.QSlider(Qt.Horizontal)
+        self.slider = QtWidgets.QSlider(Qt.Orientation.Horizontal)
         self.slider.setFixedHeight(14)
         self.slider.sliderMoved.connect(self._on_slider)
         layout.addWidget(self.slider)
@@ -155,7 +162,7 @@ class PlayerWindow(QtWidgets.QWidget):
         bar.addWidget(self.btn_toggle_embed)
 
         self.btn_recenter = QtWidgets.QToolButton()
-        self.btn_recenter.setIcon(_icon('navigation'))
+        self.btn_recenter.setIcon(_icon('gps'))
         self.btn_recenter.setIconSize(ICON_SIZE)
         self.btn_recenter.setFixedHeight(24)
         self.btn_recenter.setToolTip("Recenter (F)")
@@ -163,7 +170,7 @@ class PlayerWindow(QtWidgets.QWidget):
         bar.addWidget(self.btn_recenter)
 
         self.btn_map_tool = QtWidgets.QToolButton()
-        self.btn_map_tool.setIcon(_icon('location'))
+        self.btn_map_tool.setIcon(_icon('cursor'))
         self.btn_map_tool.setIconSize(ICON_SIZE)
         self.btn_map_tool.setCheckable(True)
         self.btn_map_tool.setFixedHeight(24)
@@ -230,26 +237,26 @@ class PlayerWindow(QtWidgets.QWidget):
 
     def keyPressEvent(self, event):
         key = event.key()
-        if key == Qt.Key_Space:
+        if key == Qt.Key.Key_Space:
             self._play_pause()
-        elif key == Qt.Key_M:
+        elif key == Qt.Key.Key_M:
             self._toggle_mute()
-        elif key == Qt.Key_Left:
+        elif key == Qt.Key.Key_Left:
             self._skip(-1)
-        elif key == Qt.Key_Right:
+        elif key == Qt.Key.Key_Right:
             self._skip(1)
-        elif key == Qt.Key_Down:
+        elif key == Qt.Key.Key_Down:
             self._skip_frame(-1)
-        elif key == Qt.Key_Up:
+        elif key == Qt.Key.Key_Up:
             self._skip_frame(1)
-        elif key == Qt.Key_A:
+        elif key == Qt.Key.Key_A:
             self.btn_map_tool.toggle()
             self._toggle_map_tool()
-        elif (key == Qt.Key_H
-                and event.modifiers() & Qt.ControlModifier
-                and event.modifiers() & Qt.ShiftModifier):
+        elif (key == Qt.Key.Key_H
+                and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+                and event.modifiers() & Qt.KeyboardModifier.ShiftModifier):
             self._reveal_map_buttons()
-        elif key == Qt.Key_F:
+        elif key == Qt.Key.Key_F:
             self._recenter_once()
         else:
             super().keyPressEvent(event)
@@ -337,13 +344,13 @@ class PlayerWindow(QtWidgets.QWidget):
         def on_progress(msg):
             try:
                 self._dl_signals.progress.emit(msg)
-            except Exception:
+            except Exception:  # nosec
                 pass
 
         def on_done(ok, err):
             try:
                 self._dl_signals.done.emit(ok, err)
-            except Exception:
+            except Exception:  # nosec
                 pass
 
         download_mpv_async(
@@ -686,6 +693,6 @@ class PlayerWindow(QtWidgets.QWidget):
                 QgsProject.instance().removeMapLayer(
                     self.gps_layer.id())
             canvas.unsetMapTool(self.skip_tool)
-        except Exception:
+        except Exception:  # nosec
             pass
         event.accept()

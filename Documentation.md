@@ -43,7 +43,7 @@ A QGIS plugin for viewing road survey videos synchronized with GPS tracks on the
 
 ### Manual Install
 
-1. Copy the `RoadVideoTracker` folder to:
+1. Copy the `road_video_tracker` folder to:
    ```
    %APPDATA%\QGIS\QGIS3\profiles\default\python\plugins\
    ```
@@ -111,7 +111,7 @@ A QGIS plugin for viewing road survey videos synchronized with GPS tracks on the
 ## Project Structure
 
 ```
-RoadVideoTracker/
+road_video_tracker/
 ├── __init__.py              # Plugin entry point (classFactory)
 ├── video_tracker.py         # Plugin class, toolbar/menu registration
 ├── tracker_dock.py          # Dock panel (file selection, Start/Quit)

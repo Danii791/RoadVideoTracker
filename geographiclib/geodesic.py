@@ -1,3 +1,4 @@
+# flake8: noqa
 """Define the :class:`~geographiclib.geodesic.Geodesic` class
 
 The ellipsoid parameters are defined by the constructor.  The direct and

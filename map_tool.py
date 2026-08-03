@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from qgis.gui import QgsMapTool
-from PyQt5.QtGui import QCursor
-from PyQt5.QtCore import Qt
+from qgis.PyQt.QtGui import QCursor
+from qgis.PyQt.QtCore import Qt
 
 
 class SkipTrackTool(QgsMapTool):
@@ -11,7 +11,7 @@ class SkipTrackTool(QgsMapTool):
         self.canvas = canvas
         self.layer = layer
         self.player = player
-        self.cursor = QCursor(Qt.CrossCursor)
+        self.cursor = QCursor(Qt.CursorShape.CrossCursor)
 
     def canvasPressEvent(self, event):
         point = self.toLayerCoordinates(self.layer, event.pos())

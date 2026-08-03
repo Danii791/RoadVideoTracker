@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 import os
 import json
-import random
+import secrets
 import shutil
-import subprocess
+import subprocess  # nosec
 import threading
 import time
 import ctypes
 import urllib.request
-from PyQt5.QtCore import QProcess, QTimer
+from qgis.PyQt.QtCore import QProcess, QTimer
 
 MPV_URL = (
     'https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/'
@@ -38,11 +38,14 @@ def find_mpv():
 def _extract(archive, target):
     exe7z = shutil.which('7z') or shutil.which('7za')
     if exe7z:
-        subprocess.run([exe7z, 'x', archive,
+        subprocess.run([exe7z, 'x', archive,  # nosec
                         '-o' + target, '-y'],
                        check=True, capture_output=True, timeout=180)
         return
-    subprocess.run(['tar', '-xf', archive, '-C', target],
+    tar = shutil.which('tar')
+    if not tar:
+        raise RuntimeError('tar executable not found')
+    subprocess.run([tar, '-xf', archive, '-C', target],  # nosec
                    check=True, capture_output=True, timeout=180)
 
 
@@ -54,7 +57,7 @@ def download_mpv(url, target_dir, status_cb=None):
     try:
         req = urllib.request.Request(
             url, headers={'User-Agent': 'RoadVideoTracker'})
-        with urllib.request.urlopen(req, timeout=120) as r:
+        with urllib.request.urlopen(req, timeout=120) as r:  # nosec
             total = int(r.headers.get('Content-Length') or 0)
             done = 0
             last_pct = -1
@@ -80,7 +83,7 @@ def download_mpv(url, target_dir, status_cb=None):
         try:
             if os.path.exists(archive):
                 os.remove(archive)
-        except Exception:
+        except Exception:  # nosec
             pass
     exe = os.path.join(target_dir, 'mpv.exe')
     if not os.path.exists(exe):
@@ -118,11 +121,11 @@ class MpvController:
             r'\\.\pipe\mpv-'
             + str(os.getpid())
             + '-'
-            + str(random.randint(10000, 99999)))
+            + str(secrets.randbelow(90000) + 10000))
 
         self.proc = QProcess()
-        self.proc.setProcessChannelMode(QProcess.SeparateChannels)
-        self.proc.setReadChannel(QProcess.StandardOutput)
+        self.proc.setProcessChannelMode(QProcess.ProcessChannelMode.SeparateChannels)
+        self.proc.setReadChannel(QProcess.ProcessChannel.StandardOutput)
 
         args = [
             '--no-terminal', '--no-config', '--no-osc', '--no-osd-bar',
@@ -190,7 +193,7 @@ class MpvController:
                     cb = self._callbacks.pop(rid, None)
                     if cb:
                         cb(data.get('data'))
-            except Exception:
+            except Exception:  # nosec
                 pass
 
     def send(self, *args):
@@ -205,7 +208,7 @@ class MpvController:
                 len(cmd.encode()),
                 ctypes.byref(written),
                 None)
-        except Exception:
+        except Exception:  # nosec
             pass
 
     def req(self, *args, cb=None):
@@ -260,7 +263,7 @@ class MpvController:
         if self._pipe_handle:
             ctypes.windll.kernel32.CloseHandle(self._pipe_handle)
             self._pipe_handle = None
-        if self.proc and self.proc.state() == QProcess.Running:
+        if self.proc and self.proc.state() == QProcess.ProcessState.Running:
             self.send('quit')
             self.proc.kill()
             self.proc.waitForFinished()

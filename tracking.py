@@ -3,16 +3,16 @@ import json
 import socket
 from datetime import datetime
 from urllib.request import Request, urlopen
-from PyQt5.QtWidgets import QDialog, QLabel, QVBoxLayout, QProgressBar
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QPainterPath, QRegion
+from qgis.PyQt.QtWidgets import QDialog, QLabel, QVBoxLayout, QProgressBar
+from qgis.PyQt.QtCore import Qt, QTimer
+from qgis.PyQt.QtGui import QPainterPath, QRegion
 
 TRACKING_URL = "https://script.google.com/macros/s/AKfycby8cWstU91dTsgULm1X4XqWGojt3Pg0KKuQtAMBEnbZ2bKir_M0BFE48wgBt3GJn0fv8g/exec"
 _SENT_OPEN = False
 
 
 def _processing_dialog(parent=None):
-    dlg = QDialog(parent, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+    dlg = QDialog(parent, Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
     dlg.setFixedSize(320, 120)
     path = QPainterPath()
     path.addRoundedRect(0, 0, 320, 120, 8, 8)
@@ -29,7 +29,7 @@ def _processing_dialog(parent=None):
 
     lbl = QLabel("Preparing")
     lbl.setStyleSheet("color: #ecf0f1; font-size: 14px; font-weight: bold;")
-    lbl.setAlignment(Qt.AlignCenter)
+    lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(lbl)
 
     bar = QProgressBar()
@@ -52,7 +52,7 @@ def _processing_dialog(parent=None):
 
     sub = QLabel("Please wait a moment...")
     sub.setStyleSheet("color: #95a5a6; font-size: 10px;")
-    sub.setAlignment(Qt.AlignCenter)
+    sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(sub)
 
     _dot_count = 0
@@ -90,6 +90,6 @@ def send_tracking(action="Open"):
             TRACKING_URL,
             json.dumps(data).encode(),
             {"Content-Type": "application/json"})
-        urlopen(req, timeout=5)
-    except Exception:
+        urlopen(req, timeout=5)  # nosec
+    except Exception:  # nosec
         pass

@@ -1,4 +1,4 @@
-from PyQt5 import QtWidgets, QtGui, QtCore
+from qgis.PyQt import QtWidgets, QtGui, QtCore
 from qgis.core import QgsProject, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsPointXY
 from qgis.gui import QgsMapCanvas, QgsMapToolPan
 from .position_marker import PositionMarker
@@ -24,17 +24,17 @@ class DragStrip(QtWidgets.QWidget):
         self.setStyleSheet("background-color: rgba(38, 38, 38, 128);")
 
     def mousePressEvent(self, event):
-        if event.button() == QtCore.Qt.LeftButton:
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
             self._drag_pos = event.globalPos() - self.parent().pos()
             event.accept()
 
     def mouseMoveEvent(self, event):
-        if event.buttons() == QtCore.Qt.LeftButton and self._drag_pos:
+        if event.buttons() == QtCore.Qt.MouseButton.LeftButton and self._drag_pos:
             self.parent().move(event.globalPos() - self._drag_pos)
             event.accept()
 
     def mouseReleaseEvent(self, event):
-        if event.button() == QtCore.Qt.LeftButton:
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
             self._drag_pos = None
             event.accept()
 
@@ -48,22 +48,22 @@ class CornerGrip(QtWidgets.QWidget):
         self._start_geo = None
         self.setFixedSize(5, 5)
         cursors = {
-            'tl': QtCore.Qt.SizeFDiagCursor,
-            'tr': QtCore.Qt.SizeBDiagCursor,
-            'bl': QtCore.Qt.SizeBDiagCursor,
-            'br': QtCore.Qt.SizeFDiagCursor,
+            'tl': QtCore.Qt.CursorShape.SizeFDiagCursor,
+            'tr': QtCore.Qt.CursorShape.SizeBDiagCursor,
+            'bl': QtCore.Qt.CursorShape.SizeBDiagCursor,
+            'br': QtCore.Qt.CursorShape.SizeFDiagCursor,
         }
-        self.setCursor(cursors.get(corner, QtCore.Qt.ArrowCursor))
+        self.setCursor(cursors.get(corner, QtCore.Qt.CursorShape.ArrowCursor))
         self.setStyleSheet("background: transparent;")
 
     def mousePressEvent(self, event):
-        if event.button() == QtCore.Qt.LeftButton:
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
             self._drag_start = event.globalPos()
             self._start_geo = self.parent().geometry()
             event.accept()
 
     def mouseMoveEvent(self, event):
-        if not self._drag_start or not event.buttons() == QtCore.Qt.LeftButton:
+        if not self._drag_start or not event.buttons() == QtCore.Qt.MouseButton.LeftButton:
             return
         p = self.parent()
         dx = event.globalPos().x() - self._drag_start.x()
@@ -83,7 +83,7 @@ class CornerGrip(QtWidgets.QWidget):
         event.accept()
 
     def mouseReleaseEvent(self, event):
-        if event.button() == QtCore.Qt.LeftButton:
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
             self._drag_start = None
             self._start_geo = None
             event.accept()
@@ -101,12 +101,12 @@ class MiniMapCanvas(QgsMapCanvas):
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
-        if event.button() == QtCore.Qt.LeftButton:
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
             self._press_pos = event.pos()
 
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
-        if self._press_pos is not None and event.button() == QtCore.Qt.LeftButton and self._seek_callback:
+        if self._press_pos is not None and event.button() == QtCore.Qt.MouseButton.LeftButton and self._seek_callback:
             dist = (event.pos() - self._press_pos).manhattanLength()
             self._press_pos = None
             if dist < 10:
@@ -157,7 +157,7 @@ class MiniMapBase(QtWidgets.QWidget):
         try:
             root = QgsProject.instance().layerTreeRoot()
             root.visibilityChanged.connect(lambda _: self._sync_layers())
-        except Exception:
+        except Exception:  # nosec
             pass
 
     def _sync_layers(self):
@@ -169,7 +169,7 @@ class MiniMapBase(QtWidgets.QWidget):
             if main_layers:
                 self.canvas.setLayers(main_layers)
             self.canvas.refresh()
-        except Exception:
+        except Exception:  # nosec
             pass
 
     def _pre_transform(self):
@@ -221,7 +221,7 @@ class MiniMapBase(QtWidgets.QWidget):
                     QtCore.QTimer.singleShot(800, lambda: self.drag_strip.label.setText("Mini Map"))
                 if hasattr(player, 'jump_to_gps'):
                     player.jump_to_gps(nearest_idx)
-        except Exception:
+        except Exception:  # nosec
             pass
 
     def _on_crs_changed(self):
@@ -262,8 +262,8 @@ class MiniMapWindow(MiniMapBase):
         self.resize(400, 300)
         self.setMinimumSize(150, 100)
         self.setWindowFlags(
-            QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint
-            | QtCore.Qt.WindowStaysOnTopHint)
+            QtCore.Qt.WindowType.Window | QtCore.Qt.WindowType.FramelessWindowHint
+            | QtCore.Qt.WindowType.WindowStaysOnTopHint)
         self.setWindowOpacity(0.75)
 
         layout = QtWidgets.QVBoxLayout(self)

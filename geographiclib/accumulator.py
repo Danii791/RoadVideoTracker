@@ -1,3 +1,4 @@
+# flake8: noqa
 """accumulator.py: transcription of GeographicLib::Accumulator class."""
 # accumulator.py
 #

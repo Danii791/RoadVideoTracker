@@ -3,7 +3,7 @@ import json
 import socket
 from datetime import datetime
 from urllib.request import Request, urlopen
-from qgis.PyQt.QtWidgets import QDialog, QLabel, QVBoxLayout, QProgressBar
+from qgis.PyQt.QtWidgets import QDialog, QLabel, QVBoxLayout, QProgressBar, QApplication
 from qgis.PyQt.QtCore import Qt, QTimer
 from qgis.PyQt.QtGui import QPainterPath, QRegion
 
@@ -65,7 +65,10 @@ def _processing_dialog(parent=None):
     timer.timeout.connect(_animate)
     timer.start(500)
 
-    screen = dlg.screen()
+    try:
+        screen = dlg.screen()
+    except AttributeError:
+        screen = QApplication.primaryScreen()
     if screen:
         center = screen.geometry().center()
         dlg.move(center.x() - 160, center.y() - 60)

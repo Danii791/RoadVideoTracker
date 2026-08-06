@@ -198,7 +198,7 @@ class TrackerDock(QtWidgets.QDockWidget):
         dlg = SettingsDialog(self)
         dlg.raise_()
         dlg.activateWindow()
-        dlg.exec_()
+        dlg.exec()
 
     def _start(self):
         if not self.videofile or not self.gpxfile:

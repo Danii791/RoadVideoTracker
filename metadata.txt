@@ -1,11 +1,11 @@
 [general]
 name=Road Video Tracker
-qgisMinimumVersion=3.0
+qgisMinimumVersion=3.2
 description=View road survey videos synced with GPS tracks on the map
-version=1.2
+version=1.3
 author=C.R Rhamdani
 email=chepieramdani@gmail.com
-about=Simplified road survey video viewer. Select a video file and a GPX track file, synchronize them, and view the vehicle position on the map in real-time while the video plays. Shows coordinates, heading, speed, and elevation. Supports mpv player with JSON IPC and Qt Multimedia fallback. For the latest version, check the GitHub Releases page: https://github.com/Danii791/RoadVideoTracker/releases.
+about=Simplified road survey video viewer. Select a video file and a GPX track file, synchronize them, and view the vehicle position on the map in real-time while the video plays. Shows coordinates, heading, speed, and elevation. Supports mpv player with JSON IPC and Qt Multimedia fallback. Requires QGIS 3.2 or higher. For the latest version, check the GitHub Releases page: https://github.com/Danii791/RoadVideoTracker/releases.
  Designer: A. Yusrizah S
  Support: Okta
  Technical Advisor: Syaeful
@@ -16,7 +16,7 @@ homepage=https://github.com/Danii791/RoadVideoTracker
 tracker=https://github.com/Danii791/RoadVideoTracker/issues
 repository=https://github.com/Danii791/RoadVideoTracker
 license=MIT
-changelog=1.2 - Added Performance Settings dialog (GPU decode, Video Only mode without audio, Performance Optimization presets: Performance / Low-Spec Systems with larger buffer, read-ahead and display sync for slow HDD/USB drives); fixed GPS cursor rendering on QGIS 3.14 and later 1.1 - Fixed crash on QGIS 3.14 and older: QDialog.screen() not available on Qt < 5.14, added QApplication.primaryScreen() fallback. 1.0 - Initial public release. Road survey video playback synchronized with GPX tracks on the map, using mpv with JSON IPC and Qt Multimedia fallback, geodesic interpolation, free/navigate modes, mini map, and embedded map panel.
+changelog=1.3 - Raised minimum QGIS version to 3.2; Qt6/PyQt6 readiness (qgis.PyQt imports, scoped enums, no exec_(), QAction from QtGui, guarded Qt Multimedia fallback) 1.2 - Added Performance Settings dialog (GPU decode, Video Only mode without audio, Performance Optimization presets: Performance / Low-Spec Systems with larger buffer, read-ahead and display sync for slow HDD/USB drives); fixed GPS cursor rendering on QGIS 3.14 and later 1.1 - Fixed crash on QGIS 3.14 and older: QDialog.screen() not available on Qt < 5.14, added QApplication.primaryScreen() fallback. 1.0 - Initial public release. Road survey video playback synchronized with GPX tracks on the map, using mpv with JSON IPC and Qt Multimedia fallback, geodesic interpolation, free/navigate modes, mini map, and embedded map panel.
 experimental=False
 deprecated=False
 designer=A. Yusrizah S.

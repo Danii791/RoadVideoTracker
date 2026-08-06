@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import threading
 
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtCore import Qt, QMetaObject, Q_ARG
+from qgis.PyQt import QtWidgets, QtCore
+from qgis.PyQt.QtCore import Qt, QMetaObject, Q_ARG
 
 from qgis.core import QgsSettings
 
@@ -59,7 +59,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.setWindowTitle("Performance Settings")
         self.setModal(True)
         self.setWindowFlags(
-            self.windowFlags() | Qt.WindowStaysOnTopHint)
+            self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         self.setMinimumWidth(340)
         self._setup_ui()
         self._load()
@@ -95,13 +95,13 @@ class SettingsDialog(QtWidgets.QDialog):
         self.combo_opt.addItem("Performance (Default)", "performance")
         self.combo_opt.setItemData(
             0, "Ringan, hemat RAM. Cocok untuk mesin normal.",
-            Qt.ToolTipRole)
+            Qt.ItemDataRole.ToolTipRole)
         self.combo_opt.addItem("Low-Spec Systems", "low_spec")
         self.combo_opt.setItemData(
             1,
             "Anti-patah untuk komputer spek rendah / HDD / USB lambat. "
             "RAM ekstra +-200 MB.",
-            Qt.ToolTipRole)
+            Qt.ItemDataRole.ToolTipRole)
         opt_row.addWidget(self.combo_opt, 1)
         g.addLayout(opt_row)
 
@@ -141,7 +141,7 @@ class SettingsDialog(QtWidgets.QDialog):
             try:
                 status = hwdec_status()
                 QMetaObject.invokeMethod(
-                    self, '_set_gpu_status', Qt.QueuedConnection,
+                    self, '_set_gpu_status', Qt.ConnectionType.QueuedConnection,
                     Q_ARG(str, status))
             except Exception:  # nosec B110
                 pass

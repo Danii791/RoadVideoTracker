@@ -2,7 +2,7 @@
 
 A QGIS 3 plugin for playing road survey videos synchronized with GPS (GPX) tracks on the map in real-time.
 
-![QGIS](https://img.shields.io/badge/QGIS-3.0%2B-green) ![License](https://img.shields.io/badge/license-MIT-blue)
+![QGIS](https://img.shields.io/badge/QGIS-3.2%2B-green) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ## Features
 
@@ -20,7 +20,7 @@ A QGIS 3 plugin for playing road survey videos synchronized with GPS (GPX) track
 
 ## Requirements
 
-- QGIS 3.0 or higher
+- QGIS 3.2 or higher
 - Windows (recommended) — mpv is downloaded automatically on first playback (~30 MB) and cached in the QGIS profile folder
 - On other platforms mpv must be installed separately, otherwise the Qt Multimedia fallback is used
 

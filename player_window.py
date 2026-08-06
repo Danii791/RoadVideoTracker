@@ -11,12 +11,15 @@ try:
     from qgis.PyQt.QtMultimedia import QMediaPlayer, QMediaContent
     from qgis.PyQt.QtMultimediaWidgets import QVideoWidget
 except ImportError:
-    import importlib
-    _qt_mm = importlib.import_module('PyQt5.QtMultimedia')
-    _qt_mmw = importlib.import_module('PyQt5.QtMultimediaWidgets')
-    QMediaPlayer = _qt_mm.QMediaPlayer
-    QMediaContent = _qt_mm.QMediaContent
-    QVideoWidget = _qt_mmw.QVideoWidget
+    try:
+        import importlib
+        _qt_mm = importlib.import_module('PyQt5.QtMultimedia')
+        _qt_mmw = importlib.import_module('PyQt5.QtMultimediaWidgets')
+        QMediaPlayer = _qt_mm.QMediaPlayer
+        QMediaContent = _qt_mm.QMediaContent
+        QVideoWidget = _qt_mmw.QVideoWidget
+    except Exception:  # nosec
+        QMediaPlayer = QMediaContent = QVideoWidget = None
 
 from qgis.core import (
     QgsProject, QgsVectorLayer, QgsFeature, QgsGeometry,
@@ -107,7 +110,7 @@ class PlayerWindow(QtWidgets.QWidget):
         self.splitter.setChildrenCollapsible(False)
         self.splitter.setHandleWidth(4)
 
-        self.video_widget = QVideoWidget()
+        self.video_widget = QVideoWidget() if QVideoWidget else QtWidgets.QWidget()
         self.video_widget.setMinimumSize(320, 240)
         self.video_widget.setStyleSheet("background-color: black;")
         self.splitter.addWidget(self.video_widget)
@@ -205,11 +208,13 @@ class PlayerWindow(QtWidgets.QWidget):
         nav.addStretch()
         layout.addLayout(nav)
 
-        self.qplayer = QMediaPlayer()
-        self.qplayer.setVideoOutput(self.video_widget)
-        self.qplayer.durationChanged.connect(self._on_duration)
-        self.qplayer.positionChanged.connect(self._on_position)
-        self.qplayer.setNotifyInterval(100)
+        self.qplayer = None
+        if QMediaPlayer is not None:
+            self.qplayer = QMediaPlayer()
+            self.qplayer.setVideoOutput(self.video_widget)
+            self.qplayer.durationChanged.connect(self._on_duration)
+            self.qplayer.positionChanged.connect(self._on_position)
+            self.qplayer.setNotifyInterval(100)
 
     def _make_btn(self, icon_name, callback):
         btn = QtWidgets.QToolButton()
@@ -392,10 +397,11 @@ class PlayerWindow(QtWidgets.QWidget):
         else:
             self.use_mpv = False
             self.mpv = None
-            url = QUrl.fromLocalFile(self.videofile)
-            self.qplayer.setMedia(QMediaContent(url))
-            self.qplayer.setMuted(True)
-            self.qplayer.play()
+            if self.qplayer is not None:
+                url = QUrl.fromLocalFile(self.videofile)
+                self.qplayer.setMedia(QMediaContent(url))
+                self.qplayer.setMuted(True)
+                self.qplayer.play()
             self.loading_label.hide()
             self.btn_play.setIcon(_icon('pause'))
             self.btn_mute.setIcon(_icon('mute'))
@@ -447,7 +453,8 @@ class PlayerWindow(QtWidgets.QWidget):
             if self.use_mpv:
                 self.mpv.pause()
             else:
-                self.qplayer.pause()
+                if self.qplayer is not None:
+                    self.qplayer.pause()
             self._paused = True
             self._eof = True
             self.btn_play.setIcon(_icon('play'))
@@ -540,13 +547,14 @@ class PlayerWindow(QtWidgets.QWidget):
                 self.mpv.seek(0)
             self.mpv.toggle()
         else:
-            if self.qplayer.state() == QMediaPlayer.PlayingState:
-                self.qplayer.pause()
-            else:
-                if self._eof:
-                    self._eof = False
-                    self.qplayer.setPosition(0)
-                self.qplayer.play()
+            if self.qplayer is not None:
+                if self.qplayer.state() == QMediaPlayer.PlayingState:
+                    self.qplayer.pause()
+                else:
+                    if self._eof:
+                        self._eof = False
+                        self.qplayer.setPosition(0)
+                    self.qplayer.play()
         self._paused = not self._paused
         self.btn_play.setIcon(_icon('play' if self._paused else 'pause'))
 
@@ -554,9 +562,10 @@ class PlayerWindow(QtWidgets.QWidget):
         if self.use_mpv:
             self.mpv.req('get_property', 'mute', cb=self._cb_mute_toggle)
         else:
-            self.qplayer.setMuted(not self.qplayer.isMuted())
-            self.btn_mute.setIcon(
-                _icon('mute' if self.qplayer.isMuted() else 'unmute'))
+            if self.qplayer is not None:
+                self.qplayer.setMuted(not self.qplayer.isMuted())
+                self.btn_mute.setIcon(
+                    _icon('mute' if self.qplayer.isMuted() else 'unmute'))
 
     def _cb_mute_toggle(self, muted):
         if muted is not None:
@@ -568,8 +577,9 @@ class PlayerWindow(QtWidgets.QWidget):
         if self.use_mpv:
             self.mpv.seek_rel(seconds)
         else:
-            self.qplayer.setPosition(
-                self.qplayer.position() + seconds * 1000)
+            if self.qplayer is not None:
+                self.qplayer.setPosition(
+                    self.qplayer.position() + seconds * 1000)
 
     def _skip_frame(self, direction):
         if self._frame_busy:
@@ -583,9 +593,10 @@ class PlayerWindow(QtWidgets.QWidget):
         if self.use_mpv:
             self.mpv.seek_rel(direction * step)
         else:
-            ms = round(step * 1000)
-            self.qplayer.setPosition(
-                self.qplayer.position() + direction * ms)
+            if self.qplayer is not None:
+                ms = round(step * 1000)
+                self.qplayer.setPosition(
+                    self.qplayer.position() + direction * ms)
         QTimer.singleShot(80, self._clear_frame_busy)
 
     def _clear_frame_busy(self):
@@ -596,7 +607,8 @@ class PlayerWindow(QtWidgets.QWidget):
         if self.use_mpv:
             self.mpv.seek(pos)
         else:
-            self.qplayer.setPosition(int(pos * 1000))
+            if self.qplayer is not None:
+                self.qplayer.setPosition(int(pos * 1000))
         self._last_recenter = 0
 
     def _on_duration(self, dur):
@@ -668,7 +680,8 @@ class PlayerWindow(QtWidgets.QWidget):
         if self.use_mpv:
             self.mpv.seek(idx)
         else:
-            self.qplayer.setPosition(idx * 1000)
+            if self.qplayer is not None:
+                self.qplayer.setPosition(idx * 1000)
         self._last_recenter = 0
         self._gps_jumped = True
         self._display(idx, *self._interpolate(idx))
@@ -692,7 +705,8 @@ class PlayerWindow(QtWidgets.QWidget):
             if self.use_mpv and self.mpv:
                 self.mpv.stop()
             else:
-                self.qplayer.stop()
+                if self.qplayer is not None:
+                    self.qplayer.stop()
             self.mini_map_win.clear_marker()
             self.mini_map_win.hide()
             self.mini_map_win.close()

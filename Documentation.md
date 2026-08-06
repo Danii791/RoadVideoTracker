@@ -6,10 +6,10 @@ A QGIS plugin for viewing road survey videos synchronized with GPS tracks on the
 |---|---|
 | **Name** | Road Video Tracker |
 | **Author** | C.R Rhamdani |
-| **Version** | 1.5 |
+| **Version** | 1.3 |
 | **Release** | July 2026 |
 | **License** | MIT |
-| **QGIS** | 3.0+ |
+| **QGIS** | 3.2+ |
 
 ## Features
 
@@ -30,7 +30,7 @@ A QGIS plugin for viewing road survey videos synchronized with GPS tracks on the
 
 ### Requirements
 
-- QGIS 3.0 or higher
+- QGIS 3.2 or higher
 - Windows (for the mpv auto-download path; on other platforms mpv must be installed separately or the Qt Multimedia fallback is used)
 - No manual installation needed — on first playback the plugin downloads the mpv player automatically (Windows, ~30 MB) and caches it in the QGIS profile folder. If mpv is already installed and available in PATH, it is used directly. If the download fails, playback falls back to the built-in Qt Multimedia engine.
 

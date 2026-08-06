@@ -30,7 +30,7 @@ class PositionMarker(QgsMapCanvasItem):
             self.setPos(self.toCanvasCoordinates(self.pos))
             self.update()
 
-    def paint(self, p, xxx, xxx2):
+    def paint(self, p, *args):
         if not self.pos:
             return
 

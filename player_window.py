@@ -28,6 +28,7 @@ from .map_tool import SkipTrackTool
 from .position_marker import PositionMarker
 from .mpv_control import (
     MpvController, find_mpv, mpv_cache_dir, download_mpv_async, MPV_URL)
+from .settings_dialog import load_opts
 from .minimap import MiniMapWindow, EmbeddedMap
 
 sys.path.insert(0, os.path.join(
@@ -74,6 +75,10 @@ class PlayerWindow(QtWidgets.QWidget):
         self._paused = True
         self._last_recenter = 0.0
         self._last_pt_t = None
+        self._xform = None
+        self._xform_crs = None
+        self._poll_ms = 100
+        self._opts = {}
         self._eof = False
 
         self.setWindowTitle("Road Video Tracker - Player")
@@ -376,7 +381,9 @@ class PlayerWindow(QtWidgets.QWidget):
     def _init_playback(self, exe):
         self.mpv = MpvController()
         hwnd = int(self.video_widget.winId())
-        if exe and self.mpv.launch(hwnd, self.videofile):
+        self._opts = load_opts()
+        self._poll_ms = int(self._opts.get('poll_ms', 100))
+        if exe and self.mpv.launch(hwnd, self.videofile, self._opts):
             self.use_mpv = True
             self.mpv.mute(True)
             self._poll_pos_rid = -1
@@ -412,7 +419,7 @@ class PlayerWindow(QtWidgets.QWidget):
     def _cb_pos(self, pos):
         if pos is not None:
             self._update_position(pos)
-        QTimer.singleShot(100, self._poll_pos)
+        QTimer.singleShot(self._poll_ms, self._poll_pos)
 
     def _poll_dur(self):
         if not self.mpv:
@@ -446,7 +453,7 @@ class PlayerWindow(QtWidgets.QWidget):
             self.btn_play.setIcon(_icon('play'))
             return
 
-        x, y, z, heading, speed = self._interpolate(gps_sec)
+        x, y, z, heading, speed = self._interpolate(pos_sec)
         self._display(gps_sec, x, y, z, heading, speed)
 
     def _interpolate(self, t):
@@ -464,7 +471,7 @@ class PlayerWindow(QtWidgets.QWidget):
         if azimuth < 0:
             azimuth += 360
 
-        frac = t - i
+        frac = min(t - i, 1.0)
         direct = Geodesic.WGS84.Direct(lat1, lon1, azimuth, frac * dist)
         x, y = direct['lon2'], direct['lat2']
         z = ele1 + frac * (ele2 - ele1)
@@ -477,13 +484,15 @@ class PlayerWindow(QtWidgets.QWidget):
         gps_time = self.GPXList[idx][3]
 
         canvas = self.iface.mapCanvas()
-        crs_src = QgsCoordinateReferenceSystem(4326)
         crs_dst = canvas.mapSettings().destinationCrs()
-        xform = QgsCoordinateTransform(
-            crs_src, crs_dst, QgsProject.instance())
+        if self._xform is None or self._xform_crs != crs_dst:
+            crs_src = QgsCoordinateReferenceSystem(4326)
+            self._xform = QgsCoordinateTransform(
+                crs_src, crs_dst, QgsProject.instance())
+            self._xform_crs = crs_dst
 
         pt = QgsPointXY(lon, lat)
-        pt_t = xform.transform(pt)
+        pt_t = self._xform.transform(pt)
         self._last_pt_t = pt_t
 
         self.position_marker.setHasPosition(True)
@@ -662,6 +671,7 @@ class PlayerWindow(QtWidgets.QWidget):
             self.qplayer.setPosition(idx * 1000)
         self._last_recenter = 0
         self._gps_jumped = True
+        self._display(idx, *self._interpolate(idx))
         self.raise_()
         self.activateWindow()
 

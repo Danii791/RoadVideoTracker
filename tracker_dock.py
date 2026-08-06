@@ -74,6 +74,13 @@ class TrackerDock(QtWidgets.QDockWidget):
 
         btn_layout = QtWidgets.QHBoxLayout()
         btn_layout.setSpacing(4)
+        self.btn_settings = QtWidgets.QToolButton()
+        self.btn_settings.setIcon(_icon('settings'))
+        self.btn_settings.setIconSize(ICON_SIZE)
+        self.btn_settings.setFixedHeight(28)
+        self.btn_settings.setToolTip("Performance Settings")
+        self.btn_settings.clicked.connect(self._open_settings)
+        btn_layout.addWidget(self.btn_settings)
         self.btn_start = QtWidgets.QPushButton(" Start")
         self.btn_start.setIcon(_icon('start'))
         self.btn_start.setIconSize(ICON_SIZE)
@@ -108,6 +115,7 @@ class TrackerDock(QtWidgets.QDockWidget):
         self.btn_select.setEnabled(False)
         self.btn_select_folder.setEnabled(False)
         self.btn_quit.setEnabled(False)
+        self.btn_settings.setEnabled(False)
         QtWidgets.QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         QCoreApplication.processEvents()
 
@@ -116,6 +124,7 @@ class TrackerDock(QtWidgets.QDockWidget):
         self.btn_select.setEnabled(True)
         self.btn_select_folder.setEnabled(True)
         self.btn_quit.setEnabled(True)
+        self.btn_settings.setEnabled(True)
         QtWidgets.QApplication.restoreOverrideCursor()
         self._check_ready()
 
@@ -183,6 +192,13 @@ class TrackerDock(QtWidgets.QDockWidget):
     def _check_ready(self):
         self.btn_start.setEnabled(
             self.videofile is not None and self.gpxfile is not None)
+
+    def _open_settings(self):
+        from .settings_dialog import SettingsDialog
+        dlg = SettingsDialog(self)
+        dlg.raise_()
+        dlg.activateWindow()
+        dlg.exec_()
 
     def _start(self):
         if not self.videofile or not self.gpxfile:

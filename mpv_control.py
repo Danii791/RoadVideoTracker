@@ -35,6 +35,51 @@ def find_mpv():
     return None
 
 
+_GPU_CACHE = None
+
+
+def detect_gpus():
+    global _GPU_CACHE
+    if _GPU_CACHE is not None:
+        return _GPU_CACHE
+    names = []
+    try:
+        import winreg
+        base = (r'SYSTEM\CurrentControlSet\Control\Class'
+                r'\{4d36e968-e325-11ce-bfc1-08002be10318}')
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, base) as key:
+            i = 0
+            while True:
+                try:
+                    sub = winreg.EnumKey(key, i)
+                except OSError:
+                    break
+                try:
+                    with winreg.OpenKey(
+                            winreg.HKEY_LOCAL_MACHINE,
+                            base + '\\' + sub) as sk:
+                        desc, _ = winreg.QueryValueEx(sk, 'DriverDesc')
+                    if desc and desc not in names:
+                        names.append(desc)
+                except OSError:
+                    pass
+                i += 1
+    except Exception:
+        names = []
+    _GPU_CACHE = names
+    return names
+
+
+def hwdec_status():
+    names = detect_gpus()
+    if names:
+        return "GPU: " + ", ".join(names) + " (hwdec=auto)"
+    exe = find_mpv()
+    if not exe:
+        return "mpv not found"
+    return "hwdec=auto (GPU not detected)"
+
+
 def _extract(archive, target):
     exe7z = shutil.which('7z') or shutil.which('7za')
     if exe7z:
@@ -112,7 +157,44 @@ class MpvController:
         self._pipe_handle = None
         self._read_timer = None
 
-    def launch(self, hwnd, filepath):
+    @staticmethod
+    def build_args(hwnd, filepath, opts=None, pipe_name=''):
+        opts = opts or {}
+        audio_only = bool(opts.get('audio_only'))
+        sync = 'display-resample' if audio_only or \
+            opts.get('sync_mode') == 'display' else 'audio'
+        drop = opts.get('framedrop', 'vo')
+        if drop not in ('vo', 'decoder', 'no'):
+            drop = 'vo'
+        cache_mb = int(opts.get('cache_mb', 50))
+        read = int(opts.get('readahead_sec', 0) or 0)
+        audio_buffer = float(opts.get('audio_buffer', 0.0) or 0.0)
+        args = [
+            '--no-terminal', '--no-config', '--no-osc', '--no-osd-bar',
+            '--osd-level=0', '--no-input-default-bindings',
+            '--hr-seek=absolute', '--hr-seek-framedrop=yes',
+            '--vo=gpu', f'--wid={hwnd}', '--pause', '--keep-open=yes',
+            '--profile=low-latency',
+            '--vd-lavc-threads=0',
+            '--cache=yes',
+            '--demuxer-max-bytes=%dMiB' % cache_mb,
+            '--framedrop=' + drop,
+            '--video-sync=' + sync,
+        ]
+        if read > 0:
+            args.append('--demuxer-readahead-secs=%d' % read)
+        if audio_buffer > 0:
+            args.append('--audio-buffer=%s' % audio_buffer)
+        if audio_only:
+            args.append('--no-audio')
+        if pipe_name:
+            args.append(f'--input-ipc-server={pipe_name}')
+        if opts.get('gpu_decode'):
+            args.append('--hwdec=auto-safe')
+        args.append(filepath)
+        return args
+
+    def launch(self, hwnd, filepath, opts=None):
         exe = find_mpv()
         if not exe:
             return False
@@ -127,17 +209,7 @@ class MpvController:
         self.proc.setProcessChannelMode(QProcess.ProcessChannelMode.SeparateChannels)
         self.proc.setReadChannel(QProcess.ProcessChannel.StandardOutput)
 
-        args = [
-            '--no-terminal', '--no-config', '--no-osc', '--no-osd-bar',
-            '--osd-level=0', '--no-input-default-bindings',
-            '--hr-seek=absolute', '--hr-seek-framedrop=no',
-            '--vo=gpu', f'--wid={hwnd}', '--pause', '--keep-open=yes',
-            '--profile=low-latency',
-            '--cache=yes', '--demuxer-max-bytes=50MiB',
-            '--framedrop=vo', '--video-sync=audio',
-            f'--input-ipc-server={pipe_name}',
-            filepath
-        ]
+        args = self.build_args(hwnd, filepath, opts, pipe_name)
         self.proc.start(exe, args)
         if not self.proc.waitForStarted(10000):
             return False

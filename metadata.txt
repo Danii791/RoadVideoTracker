@@ -5,7 +5,7 @@ description=View road survey videos synced with GPS tracks on the map
 version=1.2
 author=C.R Rhamdani
 email=chepieramdani@gmail.com
-about=Simplified road survey video viewer. Select a video file and a GPX track file, synchronize them, and view the vehicle position on the map in real-time while the video plays. Shows coordinates, heading, speed, and elevation. Supports mpv player with JSON IPC and Qt Multimedia fallback.
+about=Simplified road survey video viewer. Select a video file and a GPX track file, synchronize them, and view the vehicle position on the map in real-time while the video plays. Shows coordinates, heading, speed, and elevation. Supports mpv player with JSON IPC and Qt Multimedia fallback. For the latest version, check the GitHub Releases page: https://github.com/Danii791/RoadVideoTracker/releases.
  Designer: A. Yusrizah S
  Support: Okta
  Technical Advisor: Syaeful

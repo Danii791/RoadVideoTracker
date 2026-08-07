@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
 from qgis.PyQt.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, Qt
-from qgis.PyQt.QtGui import QAction, QIcon
+from qgis.PyQt.QtGui import QIcon
+try:
+    from qgis.PyQt.QtGui import QAction
+except ImportError:
+    from qgis.PyQt.QtWidgets import QAction
 
 from .tracker_dock import TrackerDock
 

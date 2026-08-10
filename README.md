@@ -2,7 +2,7 @@
 
 A QGIS 3 plugin for playing road survey videos synchronized with GPS (GPX) tracks on the map in real-time.
 
-![QGIS](https://img.shields.io/badge/QGIS-3.2%2B-green) ![License](https://img.shields.io/badge/license-MIT-blue)
+![QGIS](https://img.shields.io/badge/QGIS-3.14%2B-green) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ## Features
 
@@ -11,16 +11,17 @@ A QGIS 3 plugin for playing road survey videos synchronized with GPS (GPX) track
 - **Qt Multimedia fallback** — automatic fallback if mpv is unavailable
 - **Real-time GPS info** — coordinates, heading, speed, and elevation in the dock panel
 - **Geodesic interpolation** — sub-second positioning via geographiclib (WGS84)
-- **Free Mode** — toggle to disable map auto-pan
+- **Follow Road mode** — mini map auto-rotates and auto-centers to the road heading
 - **Navigate Mode** — click the map to seek the video to the nearest GPS point
-- **Mini Map** — floating, frameless, always-on-top mini map window
-- **Embedded Map** — mini map panel inside the player window (hidden by default)
-- **Keyboard shortcuts** — full playback and frame-step control
+- **Mini Map** — floating, frameless, always-on-top mini map window; stays on top and follows the player window minimize/restore
+- **Embedded Map** — mini map panel inside the player window (hidden by default; move left/right with `Ctrl+←` / `Ctrl+→`)
+- **Performance Settings** — GPU decode, video-only mode, and performance/low-spec presets
+- **Keyboard shortcuts** — full playback, frame-step, navigation, and map control
 - **Custom icons** — SVG/PNG icons for all controls
 
 ## Requirements
 
-- QGIS 3.2 or higher
+- QGIS 3.14 or higher (supported up to QGIS 4.2; Qt5 & Qt6)
 - Windows (recommended) — mpv is downloaded automatically on first playback (~30 MB) and cached in the QGIS profile folder
 - On other platforms mpv must be installed separately, otherwise the Qt Multimedia fallback is used
 
@@ -52,8 +53,9 @@ A QGIS 3 plugin for playing road survey videos synchronized with GPS (GPX) track
 | `M` | Mute / Unmute |
 | `←` / `→` | Skip ±1 second |
 | `↓` / `↑` | Step ±15 frames |
-| `F` | Toggle Free Mode (map auto-pan) |
-| `N` | Toggle Navigate mode (click map to seek) |
+| `A` | Toggle Navigate mode (click map to seek) |
+| `F` | Recenter map on the GPS position |
+| `Ctrl+←` / `Ctrl+→` | Move embedded map left/right |
 
 ## Documentation
 

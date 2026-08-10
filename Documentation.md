@@ -6,8 +6,8 @@ A QGIS plugin for viewing road survey videos synchronized with GPS tracks on the
 |---|---|
 | **Name** | Road Video Tracker |
 | **Author** | C.R Rhamdani |
-| **Version** | 1.3.1 |
-| **Release** | July 2026 |
+| **Version** | 1.4.0 |
+| **Release** | August 2026 |
 | **License** | MIT |
 | **QGIS** | 3.14+ |
 
@@ -17,12 +17,13 @@ A QGIS plugin for viewing road survey videos synchronized with GPS tracks on the
 - **mpv Player** — High-performance video playback via mpv with JSON IPC control (auto-downloads `mpv.exe` on first use on Windows, or auto-detects `mpv` in the system PATH)
 - **Qt Multimedia Fallback** — Automatic fallback to Qt Multimedia if mpv is not available
 - **Real-time GPS Info** — Displays coordinates, heading, speed, and elevation in the dock panel
-- **Free Mode** — Toggle to disable auto-panning of the map (position marker still updates)
+- **Follow Road Mode** — On the mini map, auto-rotate and auto-center to the road heading (toggle button at the bottom-right of the mini map)
 - **Navigate Mode** — Click anywhere on the map to seek the video to the nearest GPS point
 - **Autoplay Option** — Checkbox to auto-start playback after selecting video and GPX files
-- **Keyboard Shortcuts** — Full keyboard control for playback, frame stepping, and navigation
-- **Mini Map Window** — Independent floating mini map (frameless, semi-transparent, always on top, resizable from all 4 corners)
-- **Embedded Map Panel** — Mini map embedded on the right side of the player window, not active by default (activated via the `map` icon toggle), width adjustable by dragging the divider
+- **Keyboard Shortcuts** — Full keyboard control for playback, frame stepping, navigation, and embedded map position
+- **Mini Map Window** — Independent floating mini map (frameless, semi-transparent, always on top, resizable from all 4 corners); stays on top and follows the player window minimize/restore
+- **Embedded Map Panel** — Mini map panel inside the player window, not active by default (activated via the `map` icon toggle); move it left/right with `Ctrl+←` / `Ctrl+→`, width adjustable by dragging the divider
+- **Performance Settings** — GPU decode, video-only mode, and performance/low-spec presets (gear icon)
 - **Custom Icons** — All player controls use custom SVG/PNG icons
 - **Silent Tracking** — Anonymous usage statistics sent to Google Sheets on plugin open/close (fails silently if offline)
 
@@ -75,17 +76,19 @@ A QGIS plugin for viewing road survey videos synchronized with GPS tracks on the
 | ⏩ | Skip forward 1s | `→` |
 | ◀ Frame | Previous frame (15 frames) | `↓` |
 | ▶ Frame | Next frame (15 frames) | `↑` |
-| 📍 Free Mode | Toggle map auto-pan | `F` |
-| 🧭 Navigate | Click map to seek video | `N` |
+| 🧭 Navigate | Click map to seek video | `A` |
+| 📍 Recenter | Recenter map on the GPS position | `F` |
+| ↔ Move map | Move embedded map left/right | `Ctrl+←` / `Ctrl+→` |
 
-### Free Mode
+### Map Auto-Pan
 
-- **OFF (default):** Map auto-pans to follow the GPS position marker
-- **ON:** Map stays still; the position marker still moves but you can pan/zoom freely
+- During playback the map auto-pans to keep the GPS position marker centered (re-centering at most every 2.5 s, only when the marker nears the map edge).
+- Press `F` (or the 📍 button) to recenter immediately.
+- While **Navigate mode** is active, auto-pan is disabled so you can pan/zoom freely.
 
 ### Navigate Mode
 
-1. Click the Navigate button (or press `N`)
+1. Click the Navigate button (or press `A`)
 2. Click anywhere on the map
 3. The video seeks to the nearest GPS point on the track
 
@@ -93,17 +96,16 @@ A QGIS plugin for viewing road survey videos synchronized with GPS tracks on the
 
 - **Mute button** — Toggle audio
 - **Time display** — Current time / total GPS duration
-- **Mini Map** — Toggle the floating mini map window (`find-location` icon; button hidden by default, press `Ctrl+Shift+H` to reveal)
+- **Mini Map** — Toggle the floating mini map window (`find-location` icon)
 - **Embedded Map** — Toggle the map panel inside the player window (`map` icon, not active by default)
-- **Free Mode** — Toggle auto-pan
 - **Navigate** — Toggle map click-to-seek
 - **Close** — Close the player
 
 ### Mini Map & Embedded Map
 
-- The **Mini Map** is a separate frameless window: semi-transparent (75%), always on top of the player, draggable via its top strip, resizable from all 4 corner grips, with independent pan/zoom.
-- The **Embedded Map** is a panel docked to the right side of the player window, **not shown by default** — click the `map` icon toggle to activate it; drag the divider to adjust its width (min 150px). Its toggle button is always visible in the bottom bar.
-- The **Mini Map** button is hidden by default — press `Ctrl+Shift+H` (hidden dev shortcut) to reveal/hide the Mini Map button.
+- The **Mini Map** is a separate frameless window: semi-transparent (75%), always on top of the player, draggable via its top strip, resizable from all 4 corner grips, with independent pan/zoom. It stays on top and follows the player window minimize/restore.
+- **Follow Road** — the button at the bottom-right of the mini map toggles auto-rotate and auto-center to the road heading (navigation icon when ON, north-arrow icon when OFF).
+- The **Embedded Map** is a panel inside the player window, **not shown by default** — click the `map` icon toggle to activate it; drag the divider to adjust its width (min 150px); move it left/right with `Ctrl+←` / `Ctrl+→`. Its toggle button is always visible in the bottom bar.
 - Both share the same map engine (`MiniMapBase`) and sync GPS position, layer visibility, and extent with the main canvas.
 - **Only one map can be visible at a time** — turning one on automatically hides the other (to keep performance light).
 - Click-to-seek works on both maps while **Navigate mode** is active.
@@ -135,6 +137,7 @@ road_video_tracker/
 │   ├── unmute.svg / .png
 │   ├── navigate.png
 │   ├── navigation.png
+│   ├── north-arrow.svg
 │   ├── location.png
 │   ├── find-location.png
 │   ├── map.png
@@ -172,7 +175,7 @@ Select Video + GPX
   Interpolate GPS (Geodesic WGS84)
        │
        ▼
-  Update marker + recenter map (if Free Mode OFF)
+  Update marker + auto-pan map (unless Navigate mode is active)
 ```
 
 ### Key Classes
@@ -218,7 +221,7 @@ On Windows, when mpv is not found in the plugin folder or in the system PATH, it
 
 ### Code Conventions
 
-- Python 3, PyQt5
+- Python 3, PyQt (Qt5 & Qt6, via `qgis.PyQt`)
 - No comments unless requested
 - Icons loaded via `_icon()` helper (tries `.svg` first, falls back to `.png`)
 - Player controls use `QToolButton` with 20x20 icon size

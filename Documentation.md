@@ -6,10 +6,10 @@ A QGIS plugin for viewing road survey videos synchronized with GPS tracks on the
 |---|---|
 | **Name** | Road Video Tracker |
 | **Author** | C.R Rhamdani |
-| **Version** | 1.3 |
+| **Version** | 1.3.1 |
 | **Release** | July 2026 |
 | **License** | MIT |
-| **QGIS** | 3.2+ |
+| **QGIS** | 3.14+ |
 
 ## Features
 
@@ -30,7 +30,7 @@ A QGIS plugin for viewing road survey videos synchronized with GPS tracks on the
 
 ### Requirements
 
-- QGIS 3.2 or higher
+- QGIS 3.14 or higher
 - Windows (for the mpv auto-download path; on other platforms mpv must be installed separately or the Qt Multimedia fallback is used)
 - No manual installation needed — on first playback the plugin downloads the mpv player automatically (Windows, ~30 MB) and caches it in the QGIS profile folder. If mpv is already installed and available in PATH, it is used directly. If the download fails, playback falls back to the built-in Qt Multimedia engine.
 
@@ -185,7 +185,7 @@ Select Video + GPX
 | `MpvController` | `mpv_control.py` | mpv process management, JSON IPC |
 | `MiniMapBase` | `minimap.py` | Shared mini map engine (canvas, GPS transform, layer sync, seek) |
 | `MiniMapWindow` | `minimap.py` | Floating mini map window (frameless, always on top, resizable) |
-| `EmbeddedMap` | `minimap.py` | Map panel embedded in the player window (fixed 240px) |
+| `EmbeddedMap` | `minimap.py` | Map panel embedded in the player window (default 160px) |
 | `SkipTrackTool` | `map_tool.py` | Map click-to-seek |
 | `PositionMarker` | `position_marker.py` | GPS arrow marker on canvas |
 | `send_tracking` / `_processing_dialog` | `tracking.py` | Usage tracking + "Preparing..." popup |

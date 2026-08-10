@@ -47,7 +47,7 @@ class PositionMarker(QgsMapCanvasItem):
             p.setBrush(QtGui.QBrush(QtGui.QColor(0, 0, 0, self.alpha)))
         else:
             p.setBrush(QtGui.QBrush(QtGui.QColor(200, 200, 200, self.alpha)))
-        p.setPen(QtGui.QColor(255, 255, 0, self.alpha))
+        p.setPen(QtGui.QColor(0, 0, 0, 0))
         p.rotate(self.angle)
         p.drawPath(path)
         p.restore()

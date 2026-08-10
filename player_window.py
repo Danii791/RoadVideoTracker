@@ -90,6 +90,7 @@ class PlayerWindow(QtWidgets.QWidget):
         self.resize(600, 410)
         self._video_initialized = False
         self._gps_jumped = False
+        self._seek_target = None
 
         self._setup_ui()
         self._parse_gpx()
@@ -109,6 +110,7 @@ class PlayerWindow(QtWidgets.QWidget):
         self.splitter = QtWidgets.QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setChildrenCollapsible(False)
         self.splitter.setHandleWidth(4)
+        self.splitter.setToolTip("Move map: Ctrl+\u2190 / Ctrl+\u2192")
 
         self.video_widget = QVideoWidget() if QVideoWidget else QtWidgets.QWidget()
         self.video_widget.setMinimumSize(320, 240)
@@ -119,9 +121,11 @@ class PlayerWindow(QtWidgets.QWidget):
         self.embed_map.hide()
         self.splitter.addWidget(self.embed_map)
 
+        self._embed_side = 'right'
+
         self.splitter.setStretchFactor(0, 1)
         self.splitter.setStretchFactor(1, 0)
-        self.splitter.setSizes([352, 240])
+        self.splitter.setSizes([352, 160])
 
         layout.addWidget(self.splitter, 1)
 
@@ -251,6 +255,10 @@ class PlayerWindow(QtWidgets.QWidget):
             self._play_pause()
         elif key == Qt.Key.Key_M:
             self._toggle_mute()
+        elif key == Qt.Key.Key_Left and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            self._flip_embed_side()
+        elif key == Qt.Key.Key_Right and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            self._flip_embed_side()
         elif key == Qt.Key.Key_Left:
             self._skip(-1)
         elif key == Qt.Key.Key_Right:
@@ -460,8 +468,21 @@ class PlayerWindow(QtWidgets.QWidget):
             self.btn_play.setIcon(_icon('play'))
             return
 
+        if self._seek_target is not None:
+            if abs(pos_sec - self._seek_target) <= 0.2:
+                self._seek_target = None
+            else:
+                return
+
         x, y, z, heading, speed = self._interpolate(pos_sec)
         self._display(gps_sec, x, y, z, heading, speed)
+
+    def _set_seek_target(self, seconds):
+        self._seek_target = seconds
+        QTimer.singleShot(15000, self._clear_seek)
+
+    def _clear_seek(self):
+        self._seek_target = None
 
     def _interpolate(self, t):
         i = int(t)
@@ -609,6 +630,7 @@ class PlayerWindow(QtWidgets.QWidget):
         else:
             if self.qplayer is not None:
                 self.qplayer.setPosition(int(pos * 1000))
+        self._set_seek_target(pos)
         self._last_recenter = 0
 
     def _on_duration(self, dur):
@@ -669,8 +691,26 @@ class PlayerWindow(QtWidgets.QWidget):
             self.btn_toggle_embed.setChecked(True)
             self.mini_map_win.hide()
             self.btn_toggle_minimap.setChecked(False)
-            self.splitter.setSizes(
-                [self.splitter.width() - 240, 240])
+            if self._embed_side == 'left':
+                self.splitter.setSizes([160, self.splitter.width() - 160])
+            else:
+                self.splitter.setSizes(
+                    [self.splitter.width() - 160, 160])
+
+    def _flip_embed_side(self):
+        was_visible = self.embed_map.isVisible()
+        if self._embed_side == 'right':
+            self._embed_side = 'left'
+            idx, stretch, sizes = 0, (0, 1), [160, self.splitter.width() - 160]
+        else:
+            self._embed_side = 'right'
+            idx, stretch, sizes = 1, (1, 0), [self.splitter.width() - 160, 160]
+        self.splitter.insertWidget(idx, self.embed_map)
+        self.splitter.setStretchFactor(0, stretch[0])
+        self.splitter.setStretchFactor(1, stretch[1])
+        if was_visible:
+            self.embed_map.show()
+            self.splitter.setSizes(sizes)
 
     def _on_minimap_closed(self):
         self.btn_toggle_minimap.setChecked(False)
@@ -682,6 +722,7 @@ class PlayerWindow(QtWidgets.QWidget):
         else:
             if self.qplayer is not None:
                 self.qplayer.setPosition(idx * 1000)
+        self._set_seek_target(idx)
         self._last_recenter = 0
         self._gps_jumped = True
         self._display(idx, *self._interpolate(idx))

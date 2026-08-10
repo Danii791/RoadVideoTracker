@@ -1,14 +1,27 @@
+import math
+import os
+
 from qgis.PyQt import QtWidgets, QtGui, QtCore
 from qgis.core import QgsProject, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsPointXY
 from qgis.gui import QgsMapCanvas, QgsMapToolPan
 from .position_marker import PositionMarker
+
+ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icons')
+
+
+def _icon(name):
+    for ext in ('.svg', '.png'):
+        p = os.path.join(ICON_DIR, name + ext)
+        if os.path.exists(p):
+            return QtGui.QIcon(p)
+    return QtGui.QIcon()
 
 
 class DragStrip(QtWidgets.QWidget):
 
     def __init__(self, title, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(12)
+        self.setFixedHeight(11)
         self._drag_pos = None
 
         layout = QtWidgets.QHBoxLayout(self)
@@ -17,7 +30,7 @@ class DragStrip(QtWidgets.QWidget):
 
         self.label = QtWidgets.QLabel(title)
         self.label.setStyleSheet(
-            "color: #bbb; font-size: 10px; background: transparent;")
+            "color: #bbb; font-size: 8px; background: transparent;")
         layout.addWidget(self.label)
         layout.addStretch()
 
@@ -126,6 +139,9 @@ class MiniMapBase(QtWidgets.QWidget):
         self._ready = False
         self._gpx_coords = []
         self._polyline_crs = []
+        self.follow_road = False
+        self._rot_cur = 0.0
+        self.overlay_btn = None
 
         QtCore.QTimer.singleShot(200, self._do_setup)
 
@@ -237,8 +253,62 @@ class MiniMapBase(QtWidgets.QWidget):
             return
         self.marker.setHasPosition(True)
         self.marker.newCoords(pt_t)
-        self.marker.angle = heading
-        self.marker.update()
+        if self.follow_road:
+            self.marker.angle = 0
+            self.marker.update()
+
+            target = (360 - heading) % 360
+            delta = (target - self._rot_cur + 540) % 360 - 180
+            self._rot_cur = (self._rot_cur + delta * 0.3) % 360
+            self.canvas.setRotation(self._rot_cur)
+
+            rad = math.radians(heading)
+            dist = 0.25 * self.canvas.height() * self.canvas.mapSettings().mapUnitsPerPixel()
+            center = QgsPointXY(
+                pt_t.x() + math.sin(rad) * dist,
+                pt_t.y() + math.cos(rad) * dist)
+            self.canvas.setCenter(center)
+            self.canvas.refresh()
+        else:
+            self.marker.angle = heading
+            self.marker.update()
+
+    def _apply_follow_style(self):
+        self.overlay_btn.setStyleSheet(
+            "QToolButton { background: transparent; border: none; }")
+        if self.follow_road:
+            self.overlay_btn.setIcon(_icon('navigation'))
+        else:
+            self.overlay_btn.setIcon(_icon('north-arrow'))
+
+    def _on_overlay_btn(self):
+        self.follow_road = not self.follow_road
+        self.overlay_btn.setChecked(self.follow_road)
+        self._apply_follow_style()
+        if not self.follow_road:
+            self._rot_cur = 0.0
+            self.canvas.setRotation(0)
+            self.canvas.refresh()
+
+    def _setup_follow_button(self):
+        self.overlay_btn = QtWidgets.QToolButton(self)
+        self.overlay_btn.setIcon(_icon('navigation'))
+        self.overlay_btn.setIconSize(QtCore.QSize(22, 22))
+        self.overlay_btn.setFixedSize(30, 30)
+        self.overlay_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.overlay_btn.setCheckable(True)
+        self.overlay_btn.setToolTip("Follow road (auto-center)")
+        self.overlay_btn.clicked.connect(self._on_overlay_btn)
+        self._apply_follow_style()
+        self._place_overlay_btn()
+
+    def _place_overlay_btn(self):
+        if not self.overlay_btn:
+            return
+        m = 4
+        self.overlay_btn.move(
+            self.width() - self.overlay_btn.width() - m,
+            self.height() - self.overlay_btn.height() - m)
 
     def recenter_to(self, pt_t):
         if not self._ready or not pt_t:
@@ -259,12 +329,17 @@ class MiniMapWindow(MiniMapBase):
 
     def __init__(self, player, parent=None):
         super().__init__(player, parent)
-        self.resize(400, 300)
+        self.resize(235, 200)
         self.setMinimumSize(150, 100)
         self.setWindowFlags(
             QtCore.Qt.WindowType.Window | QtCore.Qt.WindowType.FramelessWindowHint
             | QtCore.Qt.WindowType.WindowStaysOnTopHint)
         self.setWindowOpacity(0.75)
+        self._was_minimized = False
+        self._keep_top = QtCore.QTimer(self)
+        self._keep_top.setInterval(300)
+        self._keep_top.timeout.connect(self._keep_on_top)
+        self.player.installEventFilter(self)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -280,6 +355,31 @@ class MiniMapWindow(MiniMapBase):
         self.grip_bl = CornerGrip(self, 'bl')
         self.grip_br = CornerGrip(self, 'br')
 
+        self._setup_follow_button()
+
+    def _keep_on_top(self):
+        self.raise_()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.raise_()
+        self._keep_top.start()
+
+    def hideEvent(self, event):
+        self._keep_top.stop()
+        super().hideEvent(event)
+
+    def eventFilter(self, obj, event):
+        if obj is self.player and event.type() == QtCore.QEvent.WindowStateChange:
+            if self.player.isMinimized():
+                if self.isVisible():
+                    self._was_minimized = True
+                    self.hide()
+            elif self._was_minimized:
+                self.show()
+                self._was_minimized = False
+        return super().eventFilter(obj, event)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w, h = self.width(), self.height()
@@ -287,8 +387,10 @@ class MiniMapWindow(MiniMapBase):
         self.grip_tr.move(w - 5, 0)
         self.grip_bl.move(0, h - 5)
         self.grip_br.move(w - 5, h - 5)
+        self._place_overlay_btn()
 
     def closeEvent(self, event):
+        self._keep_top.stop()
         self.clear_marker()
         self.closed.emit()
         event.accept()
@@ -299,9 +401,15 @@ class EmbeddedMap(MiniMapBase):
     def __init__(self, player, parent=None):
         super().__init__(player, parent)
         self.setMinimumWidth(150)
-        self.resize(240, 300)
+        self.resize(160, 300)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(self.canvas)
+
+        self._setup_follow_button()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._place_overlay_btn()

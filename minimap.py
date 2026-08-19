@@ -2,9 +2,16 @@ import math
 import os
 
 from qgis.PyQt import QtWidgets, QtGui, QtCore
+from qgis.PyQt.QtCore import Qt, QT_VERSION_STR
 from qgis.core import QgsProject, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsPointXY
 from qgis.gui import QgsMapCanvas, QgsMapToolPan
 from .position_marker import PositionMarker
+
+_QT6 = QT_VERSION_STR.startswith("6")
+if _QT6:
+    _WindowStateChange = QtCore.QEvent.Type.WindowStateChange
+else:
+    _WindowStateChange = QtCore.QEvent.WindowStateChange
 
 ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icons')
 
@@ -370,7 +377,7 @@ class MiniMapWindow(MiniMapBase):
         super().hideEvent(event)
 
     def eventFilter(self, obj, event):
-        if obj is self.player and event.type() == QtCore.QEvent.WindowStateChange:
+        if obj is self.player and event.type() == _WindowStateChange:
             if self.player.isMinimized():
                 if self.isVisible():
                     self._was_minimized = True

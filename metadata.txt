@@ -1,9 +1,9 @@
 [general]
 name=Road Video Tracker
 qgisMinimumVersion=3.14
-qgisMaximumVersion=4.2
+qgisMaximumVersion=4.9.9
 description=View road survey videos synced with GPS tracks on the map
-version=1.4.0
+version=1.4.1
 author=C.R Rhamdani
 email=chepieramdani@gmail.com
 about=Simplified road survey video viewer. Select a video file and a GPX track file, synchronize them, and view the vehicle position on the map in real-time while the video plays. Shows coordinates, heading, speed, and elevation. Supports mpv player with JSON IPC and Qt Multimedia fallback. Requires QGIS 3.14 or higher. For the latest version, check the GitHub Releases page: https://github.com/Danii791/RoadVideoTracker/releases.
@@ -17,7 +17,9 @@ homepage=https://github.com/Danii791/RoadVideoTracker
 tracker=https://github.com/Danii791/RoadVideoTracker/issues
 repository=https://github.com/Danii791/RoadVideoTracker
 license=MIT
-changelog=1.4.0 - Added Follow Road mode on mini map (auto-rotate and auto-center to road heading); mini map stays on top and follows player minimize/restore; move embedded map left/right with Ctrl+Left/Ctrl+Right; smoother GPS marker while seeking (seek target suppression)
+changelog=1.4.1 - Improved QGIS 4.x compatibility; fixed UI freeze; replaced defusedxml with standard library; added QGIS 4.2.1 compatibility gate
+    1.4.1 - Improved QGIS 4.x compatibility; fixed UI freeze; replaced defusedxml with standard library; added QGIS 4.2.1 compatibility gate
+    1.4.0 - Added Follow Road mode on mini map (auto-rotate and auto-center to road heading); mini map stays on top and follows player minimize/restore; move embedded map left/right with Ctrl+Left/Ctrl+Right; smoother GPS marker while seeking (seek target suppression)
     1.3.1 - Fixed QAction import to work on Qt5 (QGIS 3.14-3.32) and Qt6 (QGIS 3.34+) via qgis.PyQt fallback; raised qgisMinimumVersion to 3.14; added qgisMaximumVersion=4.2
     1.3 - Raised minimum QGIS version to 3.2; Qt6/PyQt6 readiness (qgis.PyQt imports, scoped enums, no exec_(), QAction from QtGui, guarded Qt Multimedia fallback)
     1.2 - Added Performance Settings dialog (GPU decode, Video Only mode without audio, Performance Optimization presets: Performance / Low-Spec Systems with larger buffer, read-ahead and display sync for slow HDD/USB drives); fixed GPS cursor rendering on QGIS 3.14 and later

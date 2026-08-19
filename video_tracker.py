@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
-from qgis.PyQt.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, Qt
+import sys
+import platform
+import configparser
+from qgis.PyQt.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, Qt, QTimer
 from qgis.PyQt.QtGui import QIcon
 try:
     from qgis.PyQt.QtGui import QAction
@@ -8,6 +11,16 @@ except ImportError:
     from qgis.PyQt.QtWidgets import QAction
 
 from .tracker_dock import TrackerDock
+
+
+def _read_plugin_version():
+    meta = os.path.join(os.path.dirname(__file__), 'metadata.txt')
+    try:
+        cp = configparser.RawConfigParser()
+        cp.read(meta)
+        return cp.get('general', 'version')
+    except Exception:  # nosec
+        return ""
 
 
 class VideoTracker:
@@ -51,20 +64,46 @@ class VideoTracker:
             parent=self.iface.mainWindow())
 
     def unload(self):
-        from .tracking import send_tracking
-        send_tracking("Close")
+        from .tracking import send_tracking, reset_sent_open_processing, clear_last_error
+        send_tracking("Quit")
+        reset_sent_open_processing()
+        clear_last_error()
         for action in self.actions:
             self.iface.removePluginMenu(self.menu, action)
             self.iface.removeToolBarIcon(action)
 
     def run(self):
-        from .tracking import send_tracking, _processing_dialog
+        from .tracking import _processing_dialog, send_tracking
         if self.dock is None:
             self.dock = TrackerDock(self.iface)
-        dlg = _processing_dialog()
-        dlg.show()
-        QCoreApplication.processEvents()
-        send_tracking("Open")
-        dlg.close()
+            dlg = _processing_dialog()
+            dlg.show()
+            QCoreApplication.processEvents()
+            self._loading_dlg = dlg
+            QTimer.singleShot(3000, self._dismiss_loading)
+            try:
+                from qgis.core import Qgis
+                from .mpv_control import find_mpv, detect_gpus
+                qgis_ver = Qgis.version() if Qgis else ""
+                mpv_avail = "true" if find_mpv() else "false"
+                gpus = detect_gpus()
+                gpu_info = ", ".join(gpus) if gpus else ""
+                send_tracking("Open",
+                    qgis_version=qgis_ver,
+                    plugin_version=_read_plugin_version(),
+                    python_version=sys.version.split()[0],
+                    os_info=platform.platform(),
+                    mpv_available=mpv_avail,
+                    gpu_info=gpu_info,
+                    mpv_fallback="",
+                    error_msg="",
+                    status="")
+            except Exception:  # nosec
+                pass
         self.iface.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.dock)
         self.dock.show()
+
+    def _dismiss_loading(self):
+        if self._loading_dlg:
+            self._loading_dlg.close()
+            self._loading_dlg = None

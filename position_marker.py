@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 from qgis.PyQt import QtGui, QtCore
+from qgis.PyQt.QtCore import QT_VERSION_STR
 from qgis.core import QgsPointXY
 from qgis.gui import QgsMapCanvasItem
+
+_QT6 = QT_VERSION_STR.startswith("6")
 
 
 class PositionMarker(QgsMapCanvasItem):
@@ -42,7 +45,10 @@ class PositionMarker(QgsMapCanvasItem):
         path.lineTo(0, -15)
 
         p.save()
-        p.setRenderHint(QtGui.QPainter.Antialiasing)
+        if _QT6:
+            p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        else:
+            p.setRenderHint(QtGui.QPainter.Antialiasing)
         if self.has_position:
             p.setBrush(QtGui.QBrush(QtGui.QColor(0, 0, 0, self.alpha)))
         else:

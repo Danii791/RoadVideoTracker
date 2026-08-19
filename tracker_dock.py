@@ -2,17 +2,30 @@
 import os
 from qgis.PyQt import QtWidgets
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtCore import QSize, Qt, QCoreApplication
+from qgis.PyQt.QtCore import QSize, Qt, QCoreApplication, QTimer, QT_VERSION_STR
 from qgis.PyQt.QtWidgets import QFileDialog
 
 from . import resources
 
-ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icons')
+_QT6 = QT_VERSION_STR.startswith("6")
+_ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icons')
 ICON_SIZE = QSize(20, 20)
+
+if _QT6:
+    _DockMovable = QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetMovable
+    _DockFloatable = QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetFloatable
+    _DockClosable = QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetClosable
+else:
+    _DockMovable = QtWidgets.QDockWidget.DockWidgetMovable
+    _DockFloatable = QtWidgets.QDockWidget.DockWidgetFloatable
+    _DockClosable = QtWidgets.QDockWidget.DockWidgetClosable
+
+_WaitCursor = Qt.CursorShape.WaitCursor
+_AlignCenter = Qt.AlignmentFlag.AlignCenter
 
 
 def _icon(name):
-    return QIcon(os.path.join(ICON_DIR, name + '.svg'))
+    return QIcon(os.path.join(_ICON_DIR, name + '.svg'))
 
 
 class TrackerDock(QtWidgets.QDockWidget):
@@ -20,13 +33,12 @@ class TrackerDock(QtWidgets.QDockWidget):
     def __init__(self, iface, parent=None):
         super().__init__(parent)
         self.iface = iface
+        self._closing = False
         self.setWindowTitle("Road Video Tracker")
         self.setMinimumWidth(220)
         self.setMaximumWidth(350)
         self.setFeatures(
-            QtWidgets.QDockWidget.DockWidgetMovable |
-            QtWidgets.QDockWidget.DockWidgetFloatable |
-            QtWidgets.QDockWidget.DockWidgetClosable)
+            _DockMovable | _DockFloatable | _DockClosable)
 
         self.videofile = None
         self.gpxfile = None
@@ -101,7 +113,7 @@ class TrackerDock(QtWidgets.QDockWidget):
         self.setWidget(widget)
 
         self.loading_label = QtWidgets.QLabel("Please wait...", widget)
-        self.loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.loading_label.setAlignment(_AlignCenter)
         self.loading_label.setStyleSheet(
             "background-color: rgba(0,0,0,180); color: white; font-size: 14px;")
         self.loading_label.hide()
@@ -116,7 +128,7 @@ class TrackerDock(QtWidgets.QDockWidget):
         self.btn_select_folder.setEnabled(False)
         self.btn_quit.setEnabled(False)
         self.btn_settings.setEnabled(False)
-        QtWidgets.QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        QtWidgets.QApplication.setOverrideCursor(_WaitCursor)
         QCoreApplication.processEvents()
 
     def _hide_loading(self):
@@ -223,12 +235,24 @@ class TrackerDock(QtWidgets.QDockWidget):
         self.player_window.show()
 
     def closeEvent(self, event):
-        self._show_loading()
-        try:
-            if self.player_window:
-                self.player_window.close()
-            from .tracking import send_tracking
-            send_tracking("Quit")
-        finally:
-            self._hide_loading()
+        if self._closing:
             event.accept()
+            return
+        event.ignore()
+        self._closing = True
+        self.loading_label.setGeometry(self.widget().rect())
+        self.loading_label.raise_()
+        self.loading_label.show()
+        self.loading_label.repaint()
+        QCoreApplication.processEvents()
+        from .tracking import send_tracking
+        def _do_close():
+            try:
+                if self.player_window:
+                    self.player_window.close()
+                send_tracking("Close")
+                send_tracking("Quit")
+            finally:
+                self.loading_label.hide()
+                self.close()
+        QTimer.singleShot(1000, _do_close)

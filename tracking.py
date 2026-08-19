@@ -1,18 +1,69 @@
 import os
+import sys
 import json
 import socket
+import platform
+import threading
+import traceback
 from datetime import datetime
 from urllib.request import Request, urlopen
 from qgis.PyQt.QtWidgets import QDialog, QLabel, QVBoxLayout, QProgressBar, QApplication
-from qgis.PyQt.QtCore import Qt, QTimer
+from qgis.PyQt.QtCore import Qt, QTimer, QT_VERSION_STR
 from qgis.PyQt.QtGui import QPainterPath, QRegion
 
+_QT6 = QT_VERSION_STR.startswith("6")
+
+_FramelessWindowHint = Qt.WindowType.FramelessWindowHint
+_WindowStaysOnTopHint = Qt.WindowType.WindowStaysOnTopHint
+_AlignCenter = Qt.AlignmentFlag.AlignCenter
+
 TRACKING_URL = "https://script.google.com/macros/s/AKfycby8cWstU91dTsgULm1X4XqWGojt3Pg0KKuQtAMBEnbZ2bKir_M0BFE48wgBt3GJn0fv8g/exec"
-_SENT_OPEN = False
+_last_error = ""
+_SENT_OPEN_PROCESSING = False
+
+
+def _install_excepthook():
+    _prev = sys.excepthook
+
+    def _hook(exc_type, exc_value, exc_tb):
+        global _last_error
+        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        if "road_video_tracker" in tb:
+            _last_error = repr(exc_value)
+        if _prev is not None:
+            _prev(exc_type, exc_value, exc_tb)
+
+    sys.excepthook = _hook
+
+
+_install_excepthook()
+
+
+def get_last_error():
+    return _last_error
+
+
+def clear_last_error():
+    global _last_error
+    _last_error = ""
+
+
+def sent_open_processing():
+    return _SENT_OPEN_PROCESSING
+
+
+def mark_open_processing_sent():
+    global _SENT_OPEN_PROCESSING
+    _SENT_OPEN_PROCESSING = True
+
+
+def reset_sent_open_processing():
+    global _SENT_OPEN_PROCESSING
+    _SENT_OPEN_PROCESSING = False
 
 
 def _processing_dialog(parent=None):
-    dlg = QDialog(parent, Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+    dlg = QDialog(parent, _FramelessWindowHint | _WindowStaysOnTopHint)
     dlg.setFixedSize(320, 120)
     path = QPainterPath()
     path.addRoundedRect(0, 0, 320, 120, 8, 8)
@@ -29,7 +80,7 @@ def _processing_dialog(parent=None):
 
     lbl = QLabel("Preparing")
     lbl.setStyleSheet("color: #ecf0f1; font-size: 14px; font-weight: bold;")
-    lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    lbl.setAlignment(_AlignCenter)
     layout.addWidget(lbl)
 
     bar = QProgressBar()
@@ -52,7 +103,7 @@ def _processing_dialog(parent=None):
 
     sub = QLabel("Please wait a moment...")
     sub.setStyleSheet("color: #95a5a6; font-size: 10px;")
-    sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    sub.setAlignment(_AlignCenter)
     layout.addWidget(sub)
 
     _dot_count = 0
@@ -75,24 +126,35 @@ def _processing_dialog(parent=None):
     return dlg
 
 
-def send_tracking(action="Open"):
-    if action == "Open":
-        global _SENT_OPEN
-        if _SENT_OPEN:
-            return
-        _SENT_OPEN = True
-    try:
-        data = {
-            "timestamp": datetime.now().isoformat(),
-            "username": os.environ.get('USERNAME', 'Unknown'),
-            "computer": os.environ.get('COMPUTERNAME', socket.gethostname()),
-            "time": datetime.now().strftime("%H:%M:%S"),
-            "action": action
-        }
-        req = Request(
-            TRACKING_URL,
-            json.dumps(data).encode(),
-            {"Content-Type": "application/json"})
-        urlopen(req, timeout=5)  # nosec
-    except Exception:  # nosec
-        pass
+def send_tracking(action="Open", **extra):
+    def _do_send():
+        try:
+            err = extra.pop("error_msg", None)
+            if err is None:
+                err = get_last_error()
+            data = {
+                "timestamp": datetime.now().isoformat(),
+                "username": os.environ.get('USERNAME', 'Unknown'),
+                "computer": os.environ.get('COMPUTERNAME', socket.gethostname()),
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "action": action,
+                "error_msg": err
+            }
+            data.update(extra)
+
+            def _send():
+                try:
+                    req = Request(
+                        TRACKING_URL,
+                        json.dumps(data).encode(),
+                        {"Content-Type": "application/json"})
+                    urlopen(req, timeout=5)  # nosec B310
+                except Exception:  # nosec
+                    pass
+
+            threading.Thread(target=_send, daemon=True).start()
+            clear_last_error()
+        except Exception:  # nosec
+            pass
+
+    _do_send()

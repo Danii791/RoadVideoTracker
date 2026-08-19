@@ -6,7 +6,7 @@ A QGIS plugin for viewing road survey videos synchronized with GPS tracks on the
 |---|---|
 | **Name** | Road Video Tracker |
 | **Author** | C.R Rhamdani |
-| **Version** | 1.4.0 |
+| **Version** | 1.4.1 |
 | **Release** | August 2026 |
 | **License** | MIT |
 | **QGIS** | 3.14+ |

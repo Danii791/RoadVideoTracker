@@ -2,24 +2,41 @@
 import os
 import sys
 import time
-from defusedxml.minidom import parse
+import platform
+from xml.dom.minidom import parse  # nosec B408
 
 from qgis.PyQt import QtWidgets, QtCore
-from qgis.PyQt.QtCore import Qt, QUrl, QTimer, QSize
+from qgis.PyQt.QtCore import Qt, QUrl, QTimer, QSize, QT_VERSION_STR
 from qgis.PyQt.QtGui import QIcon
+
+_QT6_MEDIA = False
+_QT6 = QT_VERSION_STR.startswith("6")
 try:
-    from qgis.PyQt.QtMultimedia import QMediaPlayer, QMediaContent
-    from qgis.PyQt.QtMultimediaWidgets import QVideoWidget
+    if _QT6:
+        from qgis.PyQt.QtMultimedia import QMediaPlayer, QAudioOutput
+        QMediaContent = None
+    else:
+        from qgis.PyQt.QtMultimedia import QMediaPlayer, QMediaContent
+        QAudioOutput = None
+    _QT6_MEDIA = _QT6
 except ImportError:
     try:
         import importlib
         _qt_mm = importlib.import_module('PyQt5.QtMultimedia')
-        _qt_mmw = importlib.import_module('PyQt5.QtMultimediaWidgets')
         QMediaPlayer = _qt_mm.QMediaPlayer
         QMediaContent = _qt_mm.QMediaContent
+        QAudioOutput = None
+    except Exception:  # nosec
+        QMediaPlayer = QMediaContent = QAudioOutput = None
+try:
+    from qgis.PyQt.QtMultimediaWidgets import QVideoWidget
+except ImportError:
+    try:
+        import importlib
+        _qt_mmw = importlib.import_module('PyQt5.QtMultimediaWidgets')
         QVideoWidget = _qt_mmw.QVideoWidget
     except Exception:  # nosec
-        QMediaPlayer = QMediaContent = QVideoWidget = None
+        QVideoWidget = None
 
 from qgis.core import (
     QgsProject, QgsVectorLayer, QgsFeature, QgsGeometry,
@@ -215,10 +232,14 @@ class PlayerWindow(QtWidgets.QWidget):
         self.qplayer = None
         if QMediaPlayer is not None:
             self.qplayer = QMediaPlayer()
+            if _QT6_MEDIA:
+                self._audio_out = QAudioOutput()
+                self.qplayer.setAudioOutput(self._audio_out)
             self.qplayer.setVideoOutput(self.video_widget)
             self.qplayer.durationChanged.connect(self._on_duration)
             self.qplayer.positionChanged.connect(self._on_position)
-            self.qplayer.setNotifyInterval(100)
+            if not _QT6_MEDIA:
+                self.qplayer.setNotifyInterval(100)
 
     def _make_btn(self, icon_name, callback):
         btn = QtWidgets.QToolButton()
@@ -280,7 +301,7 @@ class PlayerWindow(QtWidgets.QWidget):
             super().keyPressEvent(event)
 
     def _parse_gpx(self):
-        gpx = parse(self.gpxfile)
+        gpx = parse(self.gpxfile)  # nosec B318
         track = gpx.getElementsByTagName("trkpt")
         prev_time = None
 
@@ -407,9 +428,13 @@ class PlayerWindow(QtWidgets.QWidget):
             self.mpv = None
             if self.qplayer is not None:
                 url = QUrl.fromLocalFile(self.videofile)
-                self.qplayer.setMedia(QMediaContent(url))
+                if _QT6_MEDIA:
+                    self.qplayer.setSource(url)
+                else:
+                    self.qplayer.setMedia(QMediaContent(url))
                 self.qplayer.setMuted(True)
                 self.qplayer.play()
+            self._send_play_tracking()
             self.loading_label.hide()
             self.btn_play.setIcon(_icon('pause'))
             self.btn_mute.setIcon(_icon('mute'))
@@ -423,6 +448,46 @@ class PlayerWindow(QtWidgets.QWidget):
         self.btn_mute.setIcon(_icon('mute'))
         self._poll_pos()
         self._poll_dur()
+        self._send_play_tracking()
+
+    def _send_play_tracking(self):
+        try:
+            from .tracking import send_tracking, sent_open_processing, mark_open_processing_sent
+            if sent_open_processing():
+                return
+            from qgis.core import Qgis
+            from .mpv_control import find_mpv, detect_gpus
+            from .video_tracker import _read_plugin_version
+            qgis_ver = Qgis.version() if Qgis else ""
+            mpv_avail = "true" if find_mpv() else "false"
+            gpus = detect_gpus()
+            gpu_info = ", ".join(gpus) if gpus else ""
+            mpv_fallback = "true" if not self.use_mpv else "false"
+            error_msg = "" if self.use_mpv else "mpv not found"
+            video_name = os.path.basename(self.videofile) if self.videofile else ""
+            if self.GPXList:
+                gps = self.GPXList[0]
+                status_info = (
+                    f"Playing Successfully!\n{video_name} "
+                    f"| GPS: {gps[3]} "
+                    f"| Lat: {gps[0]} "
+                    f"| Lon: {gps[1]} "
+                    f"| Ele: {gps[2]}")
+            else:
+                status_info = f"Playing Successfully!\n{video_name}"
+            send_tracking("Open",
+                qgis_version=qgis_ver,
+                plugin_version=_read_plugin_version(),
+                python_version=sys.version.split()[0],
+                os_info=platform.platform(),
+                mpv_available=mpv_avail,
+                gpu_info=gpu_info,
+                status=status_info,
+                mpv_fallback=mpv_fallback,
+                error_msg=error_msg)
+            mark_open_processing_sent()
+        except Exception:  # nosec
+            pass
 
     def _poll_pos(self):
         if not self.mpv:
@@ -569,7 +634,11 @@ class PlayerWindow(QtWidgets.QWidget):
             self.mpv.toggle()
         else:
             if self.qplayer is not None:
-                if self.qplayer.state() == QMediaPlayer.PlayingState:
+                if _QT6_MEDIA:
+                    is_playing = self.qplayer.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+                else:
+                    is_playing = self.qplayer.state() == QMediaPlayer.PlayingState
+                if is_playing:
                     self.qplayer.pause()
                 else:
                     if self._eof:

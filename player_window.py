@@ -47,7 +47,8 @@ from qgis.core import (
 from .map_tool import SkipTrackTool
 from .position_marker import PositionMarker
 from .mpv_control import (
-    MpvController, find_mpv, mpv_cache_dir, download_mpv_async, MPV_URL)
+    MpvController, find_mpv, mpv_cache_dir, resolve_mpv_asset,
+    download_mpv_async, MPV_API_URL, MPV_PINNED_URL)
 from .settings_dialog import load_opts
 from .minimap import MiniMapWindow, EmbeddedMap
 
@@ -90,6 +91,7 @@ class PlayerWindow(QtWidgets.QWidget):
         self.skip_tool = None
         self.use_mpv = False
         self.mpv = None
+        self._mpv_error = ''
         self.fps = 30.0
         self._frame_busy = False
         self._paused = True
@@ -249,6 +251,22 @@ class PlayerWindow(QtWidgets.QWidget):
         btn.clicked.connect(callback)
         return btn
 
+    def _set_renderer(self, name):
+        self.setWindowTitle('Road Video Tracker - Player [%s]' % name)
+        if hasattr(self, 'lbl_time'):
+            self.lbl_time.setToolTip('Video renderer: ' + name)
+
+    def _show_mpv_error(self):
+        if sys.platform != 'win32' or os.environ.get('RVT_NO_MPV_POPUP') == '1':
+            return
+        QtWidgets.QMessageBox.warning(
+            self, 'Road Video Tracker',
+            'mpv could not be started; using Qt video fallback.\n'
+            + (self._mpv_error or 'mpv unavailable')
+            + '\n\nManual download: ' + MPV_API_URL
+            + '\nFallback URL: ' + MPV_PINNED_URL
+            + '\nExtract mpv.exe into: ' + mpv_cache_dir())
+
     def _loading_geometry(self):
         pos = self.video_widget.mapTo(self, QtCore.QPoint(0, 0))
         return QtCore.QRect(pos, self.video_widget.size())
@@ -392,8 +410,8 @@ class PlayerWindow(QtWidgets.QWidget):
             except Exception:  # nosec
                 pass
 
-        download_mpv_async(
-            MPV_URL, mpv_cache_dir(), on_progress, on_done)
+        url, sha = resolve_mpv_asset()
+        download_mpv_async(url, sha, mpv_cache_dir(), on_progress, on_done)
 
     def _mpv_progress(self, msg):
         self.loading_label.setText(msg)
@@ -403,12 +421,14 @@ class PlayerWindow(QtWidgets.QWidget):
 
     def _mpv_download_done(self, ok, err):
         if ok:
+            self._mpv_error = ''
             self.loading_label.setText("Starting mpv...")
             self.loading_label.setGeometry(self._loading_geometry())
             self.loading_label.raise_()
             self.loading_label.repaint()
             self._init_playback(find_mpv())
         else:
+            self._mpv_error = err or 'mpv download failed'
             self.loading_label.hide()
             self._init_playback(None)
 
@@ -419,13 +439,19 @@ class PlayerWindow(QtWidgets.QWidget):
         self._poll_ms = int(self._opts.get('poll_ms', 100))
         if exe and self.mpv.launch(hwnd, self.videofile, self._opts):
             self.use_mpv = True
+            self._mpv_error = ''
+            self._set_renderer('mpv')
             self.mpv.mute(True)
             self._poll_pos_rid = -1
             self._poll_dur_rid = -1
             QTimer.singleShot(800, self._delayed_play)
         else:
+            if not self._mpv_error:
+                self._mpv_error = self.mpv.last_error
             self.use_mpv = False
             self.mpv = None
+            self._set_renderer('Qt')
+            self._show_mpv_error()
             if self.qplayer is not None:
                 url = QUrl.fromLocalFile(self.videofile)
                 if _QT6_MEDIA:
@@ -463,7 +489,7 @@ class PlayerWindow(QtWidgets.QWidget):
             gpus = detect_gpus()
             gpu_info = ", ".join(gpus) if gpus else ""
             mpv_fallback = "true" if not self.use_mpv else "false"
-            error_msg = "" if self.use_mpv else "mpv not found"
+            error_msg = self._mpv_error if not self.use_mpv else ""
             video_name = os.path.basename(self.videofile) if self.videofile else ""
             if self.GPXList:
                 gps = self.GPXList[0]
@@ -484,6 +510,7 @@ class PlayerWindow(QtWidgets.QWidget):
                 gpu_info=gpu_info,
                 status=status_info,
                 mpv_fallback=mpv_fallback,
+                renderer=('mpv' if self.use_mpv else 'Qt'),
                 error_msg=error_msg)
             mark_open_processing_sent()
         except Exception:  # nosec

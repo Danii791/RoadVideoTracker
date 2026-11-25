@@ -6,16 +6,17 @@ A QGIS plugin for viewing road survey videos synchronized with GPS tracks on the
 |---|---|
 | **Name** | Road Video Tracker |
 | **Author** | C.R Rhamdani |
-| **Version** | 1.4.1 |
-| **Release** | August 2026 |
+| **Version** | 1.4.2 |
+| **Release** | November 2026 |
 | **License** | MIT |
 | **QGIS** | 3.14+ |
 
 ## Features
 
 - **Video + GPS Sync** — Play video while the vehicle position is shown on the QGIS map in real-time
-- **mpv Player** — High-performance video playback via mpv with JSON IPC control (auto-downloads `mpv.exe` on first use on Windows, or auto-detects `mpv` in the system PATH)
-- **Qt Multimedia Fallback** — Automatic fallback to Qt Multimedia if mpv is not available
+- **mpv Player** — High-performance video playback via mpv with JSON IPC control (auto-downloads the latest `mpv.exe` on first use on Windows, or auto-detects `mpv` in the system PATH). The download URL is resolved dynamically from the mpv-winbuild-cmake releases API, verified with SHA-256, and retried once on a 404
+- **Renderer Indicator & Repair** — The player title shows `[mpv]` or `[Qt]`; download/startup errors are reported with the original message and manual download link, and the Performance Settings dialog has a **Repair mpv** button to re-download a broken cache
+- **Qt Multimedia Fallback** — Automatic fallback to Qt Multimedia if mpv is not available (the fallback is now visible in the UI and tracking)
 - **Real-time GPS Info** — Displays coordinates, heading, speed, and elevation in the dock panel
 - **Follow Road Mode** — On the mini map, auto-rotate and auto-center to the road heading (toggle button at the bottom-right of the mini map)
 - **Navigate Mode** — Click anywhere on the map to seek the video to the nearest GPS point
@@ -33,7 +34,7 @@ A QGIS plugin for viewing road survey videos synchronized with GPS tracks on the
 
 - QGIS 3.14 or higher
 - Windows (for the mpv auto-download path; on other platforms mpv must be installed separately or the Qt Multimedia fallback is used)
-- No manual installation needed — on first playback the plugin downloads the mpv player automatically (Windows, ~30 MB) and caches it in the QGIS profile folder. If mpv is already installed and available in PATH, it is used directly. If the download fails, playback falls back to the built-in Qt Multimedia engine.
+- No manual installation needed — on first playback the plugin resolves the latest mpv build from the GitHub releases API, verifies its SHA-256 digest, and caches it in the QGIS profile folder (Windows, ~30 MB). If mpv is already installed and available in PATH, it is used directly. If the download fails, the original error is shown with a manual download link and playback falls back to the built-in Qt Multimedia engine (use **Repair mpv** in Performance Settings to retry).
 
 ### Install from QGIS
 
@@ -201,7 +202,7 @@ The plugin uses **geographiclib** (WGS84 geodesic) for sub-second GPS interpolat
 
 mpv is launched as a child process with the video embedded in the QGIS window via `--wid` (Windows handle). Communication uses mpv's JSON IPC protocol for seeking, play/pause, mute, and property queries.
 
-On Windows, when mpv is not found in the plugin folder or in the system PATH, it is downloaded automatically on first playback (from the mpv-winbuild-cmake project releases) and cached in the QGIS settings folder (`mpv/`). No mpv binary is bundled in the plugin package.
+On Windows, when mpv is not found in the plugin folder or in the system PATH, the plugin queries the mpv-winbuild-cmake `releases/latest` API, downloads the newest `mpv-x86_64-*.7z` asset, verifies its SHA-256 digest (with a pinned URL as offline fallback and one retry on 404), and caches the extracted `mpv.exe` in the QGIS settings folder (`mpv/`). The cached executable is validated with `mpv.exe --version` before use. No mpv binary is bundled in the plugin package. Failures are surfaced in the player and tracking data instead of silently falling back; **Repair mpv** in Performance Settings clears the cache and downloads again.
 
 ## Development
 

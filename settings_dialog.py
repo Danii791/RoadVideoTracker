@@ -1,14 +1,20 @@
 # -*- coding: utf-8 -*-
+import os
 import threading
 
 from qgis.PyQt import QtWidgets, QtCore
-from qgis.PyQt.QtCore import Qt, QMetaObject, Q_ARG
+from qgis.PyQt.QtCore import Qt, QMetaObject, Q_ARG, QT_VERSION_STR
+from qgis.PyQt.QtWidgets import QMessageBox
 
 from qgis.core import QgsSettings
 
-from .mpv_control import hwdec_status
+from .mpv_control import (
+    find_mpv, mpv_version, mpv_cache_dir, remove_cached_mpv,
+    resolve_mpv_asset, download_mpv, hwdec_status,
+    MPV_API_URL, MPV_PINNED_URL)
 
 PREFIX = 'road_video_tracker/'
+_QT6 = QT_VERSION_STR.startswith('6')
 
 _PRESETS = {
     'performance': {'gpu_decode': True, 'audio_only': False,
@@ -23,6 +29,11 @@ _PRESETS = {
 
 _MIGRATE_OPTIMIZE = {'auto': 'performance', 'low': 'low_spec',
                      'max': 'low_spec', 'balanced': 'low_spec'}
+
+
+class _RepairSignals(QtCore.QObject):
+    progress = QtCore.pyqtSignal(str)
+    done = QtCore.pyqtSignal(bool, str)
 
 
 def load_opts():
@@ -61,6 +72,9 @@ class SettingsDialog(QtWidgets.QDialog):
         self.setWindowFlags(
             self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         self.setMinimumWidth(340)
+        self._repair_signals = _RepairSignals()
+        self._repair_signals.progress.connect(self._set_mpv_status)
+        self._repair_signals.done.connect(self._repair_done)
         self._setup_ui()
         self._load()
 
@@ -113,6 +127,16 @@ class SettingsDialog(QtWidgets.QDialog):
         self.lbl_gpu.setStyleSheet("color: gray;")
         layout.addWidget(self.lbl_gpu)
 
+        self.lbl_mpv = QtWidgets.QLabel()
+        self.lbl_mpv.setStyleSheet("color: gray;")
+        layout.addWidget(self.lbl_mpv)
+
+        self.btn_repair = QtWidgets.QPushButton("Repair mpv")
+        self.btn_repair.setToolTip(
+            "Delete cached mpv and download the latest build again.")
+        self.btn_repair.clicked.connect(self._repair_mpv)
+        layout.addWidget(self.btn_repair)
+
         self.chk_gpu.toggled.connect(self.lbl_gpu.setVisible)
 
         btn_row = QtWidgets.QHBoxLayout()
@@ -125,6 +149,18 @@ class SettingsDialog(QtWidgets.QDialog):
         btn_row.addWidget(self.btn_cancel)
         layout.addLayout(btn_row)
 
+    def _mpv_label(self):
+        exe = find_mpv()
+        if not exe:
+            cached = os.path.join(mpv_cache_dir(), 'mpv.exe')
+            if os.path.exists(cached):
+                return 'mpv: cached file not usable'
+            return 'mpv: not found (downloads on first play)'
+        return 'mpv: ' + exe + ' | ' + mpv_version(exe)
+
+    def _set_mpv_status(self, text):
+        self.lbl_mpv.setText(text)
+
     def _load(self):
         opts = load_opts()
         self.combo_opt.blockSignals(True)
@@ -133,6 +169,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.chk_gpu.setChecked(opts['gpu_decode'])
         self.chk_noaudio.setChecked(opts['audio_only'])
         self.lbl_gpu.setText("GPU: detecting...")
+        self._set_mpv_status(self._mpv_label())
         self._detect_gpu()
         self.lbl_gpu.setVisible(opts['gpu_decode'])
 
@@ -150,6 +187,43 @@ class SettingsDialog(QtWidgets.QDialog):
     @QtCore.pyqtSlot(str)
     def _set_gpu_status(self, status):
         self.lbl_gpu.setText(status)
+
+    def _repair_mpv(self):
+        self.btn_repair.setEnabled(False)
+        self.lbl_mpv.setText('Repairing mpv...')
+        url, sha = resolve_mpv_asset(force=True)
+
+        def on_progress(msg):
+            try:
+                self._repair_signals.progress.emit(msg)
+            except Exception:  # nosec
+                pass
+
+        def work():
+            try:
+                remove_cached_mpv()
+                download_mpv(url, mpv_cache_dir(), on_progress, sha)
+                ok, err = True, ''
+            except Exception as e:
+                ok, err = False, str(e)
+            self._repair_signals.done.emit(ok, err)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _repair_done(self, ok, err):
+        self.btn_repair.setEnabled(True)
+        if ok:
+            self._set_mpv_status(self._mpv_label())
+            QMessageBox.information(
+                self, 'Road Video Tracker', 'mpv is ready.')
+            return
+        self.lbl_mpv.setText('mpv repair failed')
+        QMessageBox.warning(
+            self, 'Road Video Tracker',
+            'mpv download failed: ' + err
+            + '\n\nManual download: ' + MPV_API_URL
+            + '\nFallback URL: ' + MPV_PINNED_URL
+            + '\nExtract mpv.exe into: ' + mpv_cache_dir())
 
     def _on_opt_changed(self):
         if self.combo_opt.currentData() == 'low_spec':

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import os
+import re
 import json
+import hashlib
 import secrets
 import shutil
 import subprocess  # nosec
@@ -10,9 +12,26 @@ import ctypes
 import urllib.request
 from qgis.PyQt.QtCore import QProcess, QTimer
 
-MPV_URL = (
+MPV_API_URL = (
+    'https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/'
+    'releases/latest')
+MPV_PINNED_URL = (
     'https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/'
-    '20260610/mpv-x86_64-20260610-git-304426c.7z')
+    '20261111/mpv-x86_64-20261111-git-bcde6b93cc.7z')
+MPV_PINNED_SHA256 = (
+    'f259b5fd4b5c395617c948a4fadcdf55bba1c5282fb7c13e88626b3f71072baf')  # pragma: allowlist secret
+MPV_URL = MPV_PINNED_URL
+
+_SETTINGS_PREFIX = 'road_video_tracker/'
+_URL_CACHE_TTL = 7 * 24 * 3600
+_ASSET_RE = re.compile(r'^mpv-x86_64-\d{8}-git-[0-9a-f]+\.7z$')
+_MPV_CHECK_CACHE = {}
+_GPU_CACHE = None
+
+
+def _settings():
+    from qgis.core import QgsSettings
+    return QgsSettings()
 
 
 def mpv_cache_dir():
@@ -20,22 +39,99 @@ def mpv_cache_dir():
     return os.path.join(QgsApplication.qgisSettingsDirPath(), 'mpv')
 
 
+def resolve_mpv_asset(force=False):
+    s = _settings()
+    now = int(time.time())
+    url = s.value(_SETTINGS_PREFIX + 'mpv_url', '', type=str)
+    sha = s.value(_SETTINGS_PREFIX + 'mpv_sha256', '', type=str)
+    ts = s.value(_SETTINGS_PREFIX + 'mpv_url_ts', 0, type=int)
+    if not force and url and sha and ts and now - ts < _URL_CACHE_TTL:
+        return url, sha
+    try:
+        req = urllib.request.Request(
+            MPV_API_URL,
+            headers={'User-Agent': 'RoadVideoTracker',
+                     'Accept': 'application/vnd.github+json'})
+        with urllib.request.urlopen(req, timeout=20) as r:  # nosec
+            payload = json.loads(r.read().decode('utf-8'))
+        for asset in payload.get('assets', []):
+            name = asset.get('name', '')
+            if not _ASSET_RE.match(name):
+                continue
+            download_url = asset.get('browser_download_url', '')
+            digest = asset.get('digest', '')
+            if not download_url or not digest.startswith('sha256:'):
+                continue
+            sha = digest.split(':', 1)[1].strip().lower()
+            s.setValue(_SETTINGS_PREFIX + 'mpv_url', download_url)
+            s.setValue(_SETTINGS_PREFIX + 'mpv_sha256', sha)
+            s.setValue(_SETTINGS_PREFIX + 'mpv_url_ts', now)
+            return download_url, sha
+    except Exception:  # nosec
+        pass
+    return MPV_PINNED_URL, MPV_PINNED_SHA256
+
+
+def _mpv_usable(path):
+    try:
+        st = os.stat(path)
+    except OSError:
+        return False
+    key = (path, st.st_size, st.st_mtime)
+    if key in _MPV_CHECK_CACHE:
+        return _MPV_CHECK_CACHE[key]
+    ok = False
+    try:
+        p = subprocess.run([path, '--version'],  # nosec
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT,
+                           timeout=10)
+        ok = p.returncode == 0 and b'mpv' in p.stdout[:4096].lower()
+    except Exception:  # nosec
+        ok = False
+    _MPV_CHECK_CACHE[key] = ok
+    return ok
+
+
 def find_mpv():
     d = os.path.dirname(os.path.abspath(__file__))
     for p in [os.path.join(d, 'mpv.exe'),
-              os.path.join(d, 'mpv', 'mpv.exe')]:
-        if os.path.exists(p):
+              os.path.join(d, 'mpv', 'mpv.exe'),
+              os.path.join(mpv_cache_dir(), 'mpv.exe')]:
+        if os.path.exists(p) and _mpv_usable(p):
             return p
-    cached = os.path.join(mpv_cache_dir(), 'mpv.exe')
-    if os.path.exists(cached):
-        return cached
     found = shutil.which('mpv')
-    if found:
+    if found and _mpv_usable(found):
         return found
     return None
 
 
-_GPU_CACHE = None
+def mpv_version(path=None):
+    exe = path or find_mpv()
+    if not exe:
+        return ''
+    try:
+        out = subprocess.run([exe, '--version'],  # nosec
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT,
+                             timeout=10).stdout
+        return out.decode('utf-8', 'replace').splitlines()[0].strip()
+    except Exception:  # nosec
+        return ''
+
+
+def remove_cached_mpv():
+    d = mpv_cache_dir()
+    removed = []
+    for name in ('mpv.exe', 'mpv.7z'):
+        p = os.path.join(d, name)
+        try:
+            if os.path.exists(p):
+                os.remove(p)
+                removed.append(name)
+        except Exception:  # nosec
+            pass
+    return removed
 
 
 def detect_gpus():
@@ -89,12 +185,25 @@ def _extract(archive, target):
         return
     tar = shutil.which('tar')
     if not tar:
-        raise RuntimeError('tar executable not found')
+        raise RuntimeError(
+            'No 7z or tar executable found to extract mpv. '
+            'Install 7-Zip or use Windows 10/11.')
     subprocess.run([tar, '-xf', archive, '-C', target],  # nosec
                    check=True, capture_output=True, timeout=180)
 
 
-def download_mpv(url, target_dir, status_cb=None):
+def _sha256(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        while True:
+            chunk = f.read(65536)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def download_mpv(url, target_dir, status_cb=None, sha256=None):
     if status_cb:
         status_cb('Downloading mpv... 0%')
     os.makedirs(target_dir, exist_ok=True)
@@ -119,6 +228,11 @@ def download_mpv(url, target_dir, status_cb=None):
                             last_pct = pct
                             status_cb(
                                 'Downloading mpv... %d%%' % pct)
+        if sha256:
+            if status_cb:
+                status_cb('Verifying mpv...')
+            if _sha256(archive).lower() != sha256.lower():
+                raise RuntimeError('mpv checksum mismatch')
         if status_cb:
             status_cb('Extracting mpv...')
         _extract(archive, target_dir)
@@ -133,16 +247,27 @@ def download_mpv(url, target_dir, status_cb=None):
     exe = os.path.join(target_dir, 'mpv.exe')
     if not os.path.exists(exe):
         raise RuntimeError('mpv.exe not found after extraction')
+    if not _mpv_usable(exe):
+        raise RuntimeError('mpv.exe failed validation after extraction')
     return exe
 
 
-def download_mpv_async(url, target_dir, on_progress, on_done):
+def download_mpv_async(url, sha256, target_dir, on_progress, on_done):
     def worker():
+        ok, err = False, ''
         try:
-            download_mpv(url, target_dir, on_progress)
+            download_mpv(url, target_dir, on_progress, sha256)
             ok, err = True, None
         except Exception as e:
-            ok, err = False, str(e)
+            err = str(e)
+            if '404' in err:
+                try:
+                    new_url, new_sha = resolve_mpv_asset(force=True)
+                    on_progress('Retrying mpv download...')
+                    download_mpv(new_url, target_dir, on_progress, new_sha)
+                    ok, err = True, None
+                except Exception as e2:
+                    err = str(e2)
         on_done(ok, err)
     threading.Thread(target=worker, daemon=True).start()
 
@@ -156,6 +281,8 @@ class MpvController:
         self._callbacks = {}
         self._pipe_handle = None
         self._read_timer = None
+        self.last_error = ''
+        self._stderr = b''
 
     @staticmethod
     def build_args(hwnd, filepath, opts=None, pipe_name=''):
@@ -195,8 +322,13 @@ class MpvController:
         return args
 
     def launch(self, hwnd, filepath, opts=None):
+        self.last_error = ''
         exe = find_mpv()
         if not exe:
+            cached = os.path.join(mpv_cache_dir(), 'mpv.exe')
+            self.last_error = (
+                'mpv.exe found but not usable'
+                if os.path.exists(cached) else 'mpv not found')
             return False
 
         pipe_name = (
@@ -212,15 +344,29 @@ class MpvController:
         args = self.build_args(hwnd, filepath, opts, pipe_name)
         self.proc.start(exe, args)
         if not self.proc.waitForStarted(10000):
+            self.last_error = 'mpv failed to start: ' + \
+                str(self.proc.errorString())
             return False
+        self.proc.readyReadStandardError.connect(self._read_stderr)
 
         if not self._connect_pipe(pipe_name):
+            self.last_error = 'mpv IPC not connected'
             return False
 
         self._read_timer = QTimer()
         self._read_timer.timeout.connect(self._read_pipe)
         self._read_timer.start(50)
         return True
+
+    def _read_stderr(self):
+        try:
+            data = bytes(self.proc.readAllStandardError())
+            self._stderr = (self._stderr + data)[-4000:]
+        except Exception:  # nosec
+            pass
+
+    def stderr_tail(self):
+        return self._stderr.decode('utf-8', 'replace')
 
     def _connect_pipe(self, pipe_name):
         for i in range(100):

@@ -2,13 +2,14 @@
 
 A QGIS 3 plugin for playing road survey videos synchronized with GPS (GPX) tracks on the map in real-time.
 
-![QGIS](https://img.shields.io/badge/QGIS-3.14%2B-green) ![License](https://img.shields.io/badge/license-MIT-blue)
+![QGIS](https://img.shields.io/badge/QGIS-3.14%2B-green) ![Version](https://img.shields.io/badge/version-1.4.2-blue) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ## Features
 
 - **Video + GPS Sync** — play a video while the vehicle position is shown live on the QGIS map
-- **mpv player** — high-performance playback via mpv (JSON IPC); auto-downloaded on first use on Windows, or detected from PATH
-- **Qt Multimedia fallback** — automatic fallback if mpv is unavailable
+- **mpv player** — high-performance playback via mpv (JSON IPC); latest build resolved dynamically from GitHub releases, SHA-256 verified, auto-downloaded on first use on Windows, or detected from PATH
+- **Renderer indicator & Repair mpv** — player title shows `[mpv]`/`[Qt]`; original download errors are reported and a Repair button re-downloads a broken cache
+- **Qt Multimedia fallback** — automatic fallback if mpv is unavailable (visible in UI and tracking)
 - **Real-time GPS info** — coordinates, heading, speed, and elevation in the dock panel
 - **Geodesic interpolation** — sub-second positioning via geographiclib (WGS84)
 - **Follow Road mode** — mini map auto-rotates and auto-centers to the road heading
